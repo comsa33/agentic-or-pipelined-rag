@@ -38,4 +38,9 @@ if [ -d data/results/paper ] && [ -d data/results-openweight/final ]; then
 else
   echo "== refusal_rates_v31.py skipped: uncontrolled-grid trees not present"
 fi
+if [ -d data/results/paper ]; then
+  run uncontrolled_instances.py
+else
+  echo "== uncontrolled_instances.py skipped: data/results/paper not present"
+fi
 run f3_smoke_refusals.py || true

@@ -156,6 +156,7 @@ Some outputs also need the uncontrolled-grid trees (`data/results/paper`, `data/
 
 - the three reference rows of `grid_refusal_axis.csv` (uncontrolled trees);
 - `refusal_rates_v31.csv` (uncontrolled trees);
+- `rq3_evaluation_ablation.csv`, `rq4_structure_ablation.csv` and `ablation_full.csv`, the agent variants of the uncontrolled grid (`data/results/paper` and the 27 March 2026 reruns in `data/results`);
 - `context_budget.csv` (uncontrolled trees). `run_all.sh` does not make it. Run `uv run python -m experiments.analysis.context_budget --csv <file>`;
 - the refusal counts printed by `f3_smoke_refusals.py` (smoke tree).
 
