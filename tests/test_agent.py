@@ -53,15 +53,15 @@ def passages() -> list[Passage]:
         ),
         Passage(
             id="p4",
-            title="DataStore 연동 가이드",
-            content="DataStore는 데이터 파이프라인 관리를 위한 마이크로서비스입니다.",
-            source="docs/datastore.md",
+            title="StorageService Integration Guide",
+            content="StorageService is a microservice that manages data pipelines.",
+            source="docs/storage-service.md",
         ),
         Passage(
             id="p5",
-            title="DSL 함수 레퍼런스",
-            content="ExternalConnector 함수로 외부 시스템과 연동할 수 있습니다.",
-            source="docs/dsl-reference.md",
+            title="Function Reference",
+            content="The FetchRecords function reads records from other systems.",
+            source="docs/function-reference.md",
         ),
     ]
 
@@ -139,12 +139,12 @@ class TestTermIndex:
         results = idx.lookup("API")
         assert len(results) > 0
 
-    def test_lookup_korean_term(self, passages):
+    def test_lookup_content_term(self, passages):
         idx = TermIndex()
         idx.build(passages)
 
-        # "데이터" should find DataStore-related terms
-        results = idx.lookup("데이터")
+        # "data" should find StorageService-related terms
+        results = idx.lookup("data")
         assert len(results) > 0
 
     def test_lookup_no_match(self, passages):

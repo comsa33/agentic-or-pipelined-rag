@@ -57,7 +57,7 @@ uv run python scripts/prepare_datasets.py --dataset musique --sample 500
 uv run python scripts/prepare_datasets.py --dataset financebench
 ```
 
-These commands reproduce the files the runs used byte for byte, and the seed-42 draw from them gives the question set of every recorded run.
+These commands reproduce the files the runs used byte for byte, and the seed-42 draw from them gives the question set of every recorded run. The two community mirrors (2WikiMultiHopQA, MuSiQue) are loaded at a pinned revision.
 
 Build the hybrid (FAISS + BM25) indices with the paper's embedding model:
 
@@ -67,7 +67,9 @@ EMBEDDING_MODEL=all-MiniLM-L6-v2 uv run python scripts/build_index.py --dataset 
 
 The default `EMBEDDING_MODEL` in the code is `text-embedding-3-small` (OpenAI, paid). The paper used `all-MiniLM-L6-v2`, which runs locally. `.env.example` sets it.
 
-**FinanceBench passage titles.** While building the FinanceBench index, `build_index.py` asks `PREPROCESS_MODEL` (an LLM) to name the section of each evidence page, and the passage title is `<document> — <section>`. Retrieval scores only the passage text, so the titles are not used for the ranking. The other three indices are rebuilt from the same passages as the indices the runs used.
+The FinanceBench step calls `PREPROCESS_MODEL`, an LLM. Its default is `gpt-4o-mini` (OpenAI, paid), and `.env.example` does not change it. Without a working key the step does not stop: each failed batch is logged as a warning and given a heuristic title (the first content line of the page). Which model built the FinanceBench index the runs used is not recorded. To build only the three Wikipedia-based indices, which make no model call, pass `--dataset hotpotqa`, `--dataset 2wikimultihopqa` or `--dataset musique`.
+
+**FinanceBench passage titles.** While building the FinanceBench index, `build_index.py` asks `PREPROCESS_MODEL` to name the section of each evidence page, and the passage title is `<document> — <section>`. Retrieval scores only the passage text, so the titles are not used for the ranking. They do reach the prompts, because passages are given to the model as `[id, title, content]` (`pipeline/base.py`, `pipeline/crag.py`). A rebuilt FinanceBench index gets new titles, so its prompts differ from those of the recorded runs. Whether the index the runs used will be deposited is stated under [Data and analysis](#data-and-analysis). The other three indices are rebuilt from the same passages as the indices the runs used.
 
 ## Run one cell of the controlled grid
 
@@ -95,6 +97,8 @@ uv run python experiments/run.py --config configs/experiment/rq1.yaml \
 | `2wikimultihopqa` | 200 |
 | `musique` | 200 |
 | `financebench` | 150 |
+
+The pipelines retrieve 50 candidates per query. The agent's `search_passages` tool returns 10 per call unless the agent passes another `top_k`.
 
 For the Claude Sonnet runs, set the four model slots to `anthropic/claude-sonnet-5-5` and set `ANTHROPIC_KEY_SLOT`.
 
@@ -133,18 +137,32 @@ uv run python scripts/run_llm_judge.py data/results-campaign/<run_dir> --judge-m
 
 The recorded runs have version-1 manifests. Those record the process defaults rather than the settings of each configuration, so the validator reports that check as a warning on them, not a pass. The settings each configuration ran under are in its `_summary.json`. Runs made with this code write version-2 manifests (`settings_by_variant`), which the validator checks.
 
+Four recorded runs fail the validator:
+
+- `20260908_122346_rq1_2wikimultihopqa_n200_gpt-5-mini_k1`, `20260910_085356_rq1_musique_n200_gpt-5-mini_k1` and `20260911_141538_rq1_hotpotqa_n200_gpt-5-mini_k1` fail two CRAG checks.
+  - `errors`: 1, 2 and 3 error rows. Azure's content filter blocked these questions. They are listed in `exclusions.json`.
+  - `usage complete`: 6, 3 and 3 rows whose calls had not all reported usage within the 10-second wait, so their token and cost figures may be short.
+- `20261027_075201_budget_matched_2wikimultihopqa_n200_claude-sonnet-5-5_k1` fails `run finished` and `variants complete`. It was stopped after its first configuration (Loop at budget 10). The paper's supplementary S4 gives the reason.
+
 ## Rebuild the paper's tables
 
 ```bash
 scripts/paper/run_all.sh <judge41_vs_human_hedge167_rows.csv>
 ```
 
-The script runs the analyses in dependency order and writes to `scripts/paper/out/`. It reads `data/results-campaign` and `data/raw` and makes no model call. The argument is the file of 167 human-labelled rows from the paper's supplementary data. Parts that need the uncontrolled-grid trees (`data/results/paper`, `data/results-openweight/final`) or the Sonnet smoke tree (`data/results-smoke-f23-sonnet`) run only when those trees are present.
+The script runs the analyses in dependency order and writes to `scripts/paper/out/`. It reads `data/results-campaign` and `data/raw` and makes no model call. The argument is the file of 167 human-labelled rows from the paper's supplementary data.
 
-The following are results only, because they need files that are not released (the human annotators' label sheets and the uncontrolled judge-panel verdicts):
+Some outputs also need the uncontrolled-grid trees (`data/results/paper`, `data/results-openweight/final`) or the Sonnet smoke tree (`data/results-smoke-f23-sonnet`). Whether those trees will be deposited is not yet decided (see [Data and analysis](#data-and-analysis)). These outputs are rebuilt only when the tree they need is present:
+
+- the three reference rows of `grid_refusal_axis.csv` (uncontrolled trees);
+- `refusal_rates_v31.csv` (uncontrolled trees);
+- `context_budget.csv` (uncontrolled trees). `run_all.sh` does not make it. Run `uv run python -m experiments.analysis.context_budget --csv <file>`;
+- the refusal counts printed by `f3_smoke_refusals.py` (smoke tree).
+
+The following are results only, because they need files that are not released (the human annotators' label sheets, the uncontrolled judge-panel verdicts and the analysis scripts that read them):
 
 - the judge-human κ per workload and on all 200 items;
-- the uncontrolled-grid judge sweep;
+- the uncontrolled-grid judge sweep and judge swap (`judge41_uncontrolled_*`);
 - the literature-audit coding.
 
 Their outputs are in the paper's supplementary data.
@@ -157,6 +175,7 @@ This repository is the final state of the development code (`a0d70e0`, made afte
 
 - names, comments and documentation tidied;
 - unused modules removed (prompt optimisation, an old human-evaluation sheet, old analyses, PopQA, Natural Questions and Wikipedia loaders);
+- unused fields removed: the optimisation fields of `config/loader.py` (`optimization`, `train_size`, `val_size`) and the topic list of `config/settings.py`; the `datasets` default of `config/settings.py` now names the four workloads;
 - an import cycle in `agentic_rag/tools` fixed.
 
 Against the run commits, later development commits changed:
@@ -167,13 +186,16 @@ Against the run commits, later development commits changed:
 
 The pipelines, retriever, signatures and tools are the same at all five commits.
 
-Every string that reaches a model prompt is identical to each of the five commits:
+The routing heuristic (`pipeline/_mixin.py`) and the term regex (`retriever/term_index.py`) contain Korean keywords from an earlier document-QA system. They are kept unchanged so that the code stays identical to the run commits. The routing heuristic is not run in the controlled grid. Naive RAG and CRAG do not use it, and the other three configurations turn agent routing off.
 
-- the Signature instructions and field descriptions;
+The prompt text is identical to each of the five commits:
+
+- the instructions and field descriptions of every Signature, including the agent Signature as built at run time in all four evaluation modes and the Signatures defined inside functions (the LLM judge, the faithfulness check);
 - the docstrings of the tools given to the agent;
-- the prompt constants.
+- the prompt constants;
+- the code that formats passages into a prompt and the FinanceBench section-title prompt.
 
-The only difference is one unused Korean prompt constant, which was removed. To check, dump both trees and compare:
+The only difference is one unused Korean prompt constant, which was removed. The check does not cover the JSON the agent's tools return as observations, or the text DSPy and litellm add around the prompts (their versions are fixed by `uv.lock`). To check, dump both trees and compare:
 
 ```bash
 uv run python scripts/dump_prompts.py <development-code-tree> > run.json
@@ -190,7 +212,7 @@ uv run pytest tests/
 Seven tests are skipped without the recorded runs:
 
 - Six read the campaign. To run them, point `CAMPAIGN_RESULTS_DIR` at a `results-campaign` directory (and `RAW_DATA_DIR` at `data/raw` if it is not next to it).
-- One checks that the validator rejects an uncontrolled March run. It needs `data/results/paper`.
+- One checks that the validator rejects an uncontrolled March 2026 run. It needs `data/results/paper`, which is not in the planned deposit.
 
 ## Data and analysis
 
@@ -199,7 +221,9 @@ The recorded runs will be deposited on Zenodo (**DOI: 10.5281/zenodo.XXXXXXX**, 
 - the run manifests, result rows, judge verdicts and exclusion lists of the campaign (`data/results-campaign`);
 - the prepared question files the runs drew from.
 
-Datasets keep their own licences (below). Result rows that quote FinanceBench text are under its non-commercial terms.
+Whether the deposit will also hold the FinanceBench index the runs used, the uncontrolled-grid trees and the Sonnet smoke tree is not yet decided.
+
+Datasets keep their own licences (below), and files derived from a dataset keep its terms. Result rows quote questions, reference answers and predictions, and the prepared question files contain the full contexts.
 
 ## Datasets and licences
 
@@ -207,12 +231,12 @@ Datasets keep their own licences (below). Result rows that quote FinanceBench te
 
 | Workload | Loaded from | Original release | Licence |
 |---|---|---|---|
-| HotpotQA | `hotpot_qa` (distractor, validation), now `hotpotqa/hotpot_qa` | Yang et al. (2018) | CC BY-SA 4.0 |
-| 2WikiMultiHopQA | `framolfese/2WikiMultihopQA` (mirror, validation) | Ho et al. (2020), Alab-NII/2wikimultihop | Apache 2.0 |
-| MuSiQue | `bdsaglam/musique` (mirror, validation, answerable) | Trivedi et al. (2022), StonyBrookNLP/musique | CC BY 4.0 |
-| FinanceBench | `PatronusAI/financebench` | Islam et al. (2023) | CC BY-NC 4.0 (non-commercial) |
+| HotpotQA | `hotpot_qa` (distractor, validation), now `hotpotqa/hotpot_qa` | Yang et al. (2018) | CC BY-SA 4.0 (share-alike), as stated on hotpotqa.github.io |
+| 2WikiMultiHopQA | `framolfese/2WikiMultihopQA` (mirror, validation) | Ho et al. (2020), Alab-NII/2wikimultihop | Apache 2.0, the licence of the original GitHub repository, which states no separate licence for the data |
+| MuSiQue | `bdsaglam/musique` (mirror, validation, answerable) | Trivedi et al. (2022), StonyBrookNLP/musique | CC BY 4.0, as stated in the original repository's README |
+| FinanceBench | `PatronusAI/financebench` | Islam et al. (2023) | CC BY-NC 4.0 (non-commercial), as stated on the Hugging Face dataset card. The GitHub release (patronus-ai/financebench) states no licence |
 
-The mirrors do not state a licence on the Hub.
+The two mirrors state no licence on the Hub.
 
 ## Citation
 

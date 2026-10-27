@@ -108,7 +108,12 @@ def prepare_2wikimultihopqa(output_dir: Path, sample_size: int | None = None) ->
     from datasets import load_dataset
 
     logger.info("Loading 2WikiMultiHopQA dataset...")
-    ds = load_dataset("framolfese/2WikiMultihopQA", split="validation")
+    # Community mirror: pinned to the revision the runs were prepared from.
+    ds = load_dataset(
+        "framolfese/2WikiMultihopQA",
+        split="validation",
+        revision="fe713bfbd1afbca1a65246741a75890405d56a3a",
+    )
 
     items = []
     for i, row in enumerate(ds):
@@ -165,7 +170,12 @@ def prepare_musique(output_dir: Path, sample_size: int | None = None) -> Path:
     from datasets import load_dataset
 
     logger.info("Loading MuSiQue dataset...")
-    ds = load_dataset("bdsaglam/musique", split="validation")
+    # Community mirror: pinned to the revision the runs were prepared from.
+    ds = load_dataset(
+        "bdsaglam/musique",
+        split="validation",
+        revision="22873a405dd809893b22ada0b499299fb612d2df",
+    )
 
     items = []
     for row in ds:

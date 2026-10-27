@@ -25,7 +25,7 @@ data/indices/
 data/results/
 data/results-*/
 data/human_eval/
-human_eval.csv
+human_eval*.csv
 scripts/paper/out/
 
 # Jupyter
@@ -38,6 +38,12 @@ scripts/paper/out/
 .pytest_cache/
 htmlcov/
 .coverage
+
+# Local assistant and agent files
+.claude/
+.omc/
+AGENTS.md
+CLAUDE.md
 
 # IDE
 .idea/

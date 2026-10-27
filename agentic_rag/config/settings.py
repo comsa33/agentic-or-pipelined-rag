@@ -232,7 +232,8 @@ class AgentSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="AGENT_")
 
-    max_iterations: int = 5  # ReAct reasoning-action iterations
+    # ReAct reasoning-action iterations. configs/base.yaml sets 10, the value the runs used.
+    max_iterations: int = 5
 
     # Tool-level ablation: None = all tools enabled
     # Valid names (7): search, decompose, structure, terminology, evaluate, inspect, calculate

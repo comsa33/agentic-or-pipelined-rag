@@ -18,9 +18,10 @@ Usage:
     # Through the OpenAI Batch API: same requests, rows and summary as above.
     # State is kept in <dir>/judge_batch_<tag>/; rerun the same command to resume.
 
-The API key must be in the shell environment (e.g. `set -a; source .env; set +a`):
-settings read .env but do not export it, and without OPENAI_API_KEY every call
-fails and is recorded as an "error" verdict.
+Run from the repository root, or export the key (e.g. `set -a; source .env; set +a`).
+Settings read .env without exporting it, but importing litellm loads .env from
+the current directory. Without OPENAI_API_KEY every call fails and is recorded
+as an "error" verdict.
     uv run python scripts/run_llm_judge.py data/results-campaign/<run_dir>/ --judge-model openai/gpt-4.1 --batch
 """
 

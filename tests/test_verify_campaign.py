@@ -242,10 +242,10 @@ def test_rows_made_with_cache_on_fail(tmp_path):
 
 
 def test_march_2026_paper_run_is_rejected():
-    """The directories the paper was built from must not pass: that is the point."""
+    """The uncontrolled March 2026 runs must not pass: that is the point."""
     paper = Path("data/results/paper")
     if not paper.exists():
-        pytest.skip("paper results not on this machine")
+        pytest.skip("needs data/results/paper, the uncontrolled March 2026 runs (not released)")
     run = next(paper.glob("*_rq1_2wikimultihopqa_*"))
     assert "manifest" in _failed(verify_run_dir(run, n=200))
 

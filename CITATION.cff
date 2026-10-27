@@ -3,13 +3,14 @@ message: "If you use this code, please cite the paper below."
 title: "Agentic or Pipelined? Code for a confound-controlled empirical study"
 type: software
 license: MIT
+repository-code: "https://github.com/comsa33/agentic-or-pipelined-rag"
 authors:
   - family-names: Lee
     given-names: Ruo
   - family-names: Oh
     given-names: Taeyeon
 preferred-citation:
-  type: article
+  type: unpublished
   title: "Agentic or Pipelined? A Confound-Controlled Empirical Study of an Architectural Decision in Retrieval-Augmented LLM Applications"
   authors:
     - family-names: Lee
@@ -17,4 +18,4 @@ preferred-citation:
     - family-names: Oh
       given-names: Taeyeon
   year: 2026
-  journal: "Under review (journal to be announced)"
+  notes: "Manuscript under review"
