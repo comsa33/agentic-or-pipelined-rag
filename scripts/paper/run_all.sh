@@ -5,8 +5,8 @@
 # The human-labelled rows for judge_gpt41_grid.py are the supplementary file
 # judge41_vs_human_hedge167_rows.csv; pass its path as the first argument.
 # Parts that read the uncontrolled trees (data/results/paper,
-# data/results-openweight/final) or the Sonnet smoke tree run only when those
-# trees are present. Everything is written to scripts/paper/out/. No API call.
+# data/results-openweight/final, data/results-topk) or the Sonnet smoke tree
+# run only when those trees are present. Everything is written to scripts/paper/out/. No API call.
 #
 # Usage:
 #   scripts/paper/run_all.sh <judge41_vs_human_hedge167_rows.csv>
@@ -42,5 +42,10 @@ if [ -d data/results/paper ]; then
   run uncontrolled_instances.py
 else
   echo "== uncontrolled_instances.py skipped: data/results/paper not present"
+fi
+if [ -d data/results/paper ] && [ -d data/results-openweight/final ] && [ -d data/results-topk ]; then
+  run uncontrolled_judge.py
+else
+  echo "== uncontrolled_judge.py skipped: uncontrolled-grid or sweep trees not present"
 fi
 run f3_smoke_refusals.py || true

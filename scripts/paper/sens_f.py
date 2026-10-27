@@ -323,9 +323,9 @@ def main() -> int:
                     f"${num(c['delta_F'])}{star}$ [${num(c['ci_lo_F'])}$, ${num(c['ci_hi_F'])}$]"
                     f"$^{{\\mathrm{{{stab}}}}}${g}"
                 )
-                parts.append(
-                    f"{{\\bfseries\\boldmath {body}}}" if c["sign_F"] in ("+", "-") else body
-                )
+                # Bold: a tested cell whose 95% CI excludes zero (never a descriptive one).
+                bold = c["sign_F"] in ("+", "-") and not c["descriptive"]
+                parts.append(f"{{\\bfseries\\boldmath {body}}}" if bold else body)
             lines.append(
                 f" & {mlabel} $\\Delta$ [95\\% CI]\n   & " + "\n   & ".join(parts) + " \\\\"
             )

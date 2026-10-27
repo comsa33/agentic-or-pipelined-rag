@@ -12,7 +12,7 @@ that its F1 rows equal the _A F1 rows written by controlled_grid_analysis.py
 
 Writes sens_a_table.csv (one row per model, metric and cell) and
 sens_a_table.tex (a table fragment laid out like tab:rq1_main: n, levels, and
-Delta [95% CI] with bold = CI excludes 0, * = Holm p < .05, s/u = run
+Delta [95% CI] with bold = tested cell whose CI excludes 0, * = Holm p < .05, s/u = run
 stability, dagger = descriptive) to scripts/paper/out/robustness/. Reads only;
 no API call.
 
@@ -184,9 +184,9 @@ def main() -> int:
                     f"${num(float(c['delta_A']))}{star}$ [${num(float(c['ci_lo_A']))}$, "
                     f"${num(float(c['ci_hi_A']))}$]$^{{\\mathrm{{{stab}}}}}${g}"
                 )
-                parts.append(
-                    f"{{\\bfseries\\boldmath {body}}}" if c["sign_A"] in ("+", "-") else body
-                )
+                # Bold: a tested cell whose 95% CI excludes zero (never a descriptive one).
+                bold = c["sign_A"] in ("+", "-") and not c["descriptive"]
+                parts.append(f"{{\\bfseries\\boldmath {body}}}" if bold else body)
             lines.append(
                 f" & {mlabel} $\\Delta$ [95\\% CI]\n   & " + "\n   & ".join(parts) + " \\\\"
             )

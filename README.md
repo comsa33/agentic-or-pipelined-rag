@@ -152,18 +152,18 @@ scripts/paper/run_all.sh <judge41_vs_human_hedge167_rows.csv>
 
 The script runs the analyses in dependency order and writes to `scripts/paper/out/`. It reads `data/results-campaign` and `data/raw` and makes no model call. The argument is the file of 167 human-labelled rows from the paper's supplementary data.
 
-Some outputs also need the uncontrolled-grid trees (`data/results/paper`, `data/results-openweight/final`) or the Sonnet smoke tree (`data/results-smoke-f23-sonnet`). Whether those trees will be deposited is not yet decided (see [Data and analysis](#data-and-analysis)). These outputs are rebuilt only when the tree they need is present:
+Some outputs also need the uncontrolled-grid trees (`data/results/paper`, `data/results-openweight/final`, and the July FinanceBench sweep in `data/results-topk`) or the Sonnet smoke tree (`data/results-smoke-f23-sonnet`). Whether those trees will be deposited is not yet decided (see [Data and analysis](#data-and-analysis)). These outputs are rebuilt only when the tree they need is present:
 
 - the three reference rows of `grid_refusal_axis.csv` (uncontrolled trees);
 - `refusal_rates_v31.csv` (uncontrolled trees);
 - `rq3_evaluation_ablation.csv`, `rq4_structure_ablation.csv` and `ablation_full.csv`, the agent variants of the uncontrolled grid (`data/results/paper` and the 27 March 2026 reruns in `data/results`);
+- `judge41_uncontrolled_*`, the uncontrolled-grid judge sweep and judge swap, from the verdicts stored in those trees (all three uncontrolled trees);
 - `context_budget.csv` (uncontrolled trees). `run_all.sh` does not make it. Run `uv run python -m experiments.analysis.context_budget --csv <file>`;
 - the refusal counts printed by `f3_smoke_refusals.py` (smoke tree).
 
-The following are results only, because they need files that are not released (the human annotators' label sheets, the uncontrolled judge-panel verdicts and the analysis scripts that read them):
+The following are results only, because they need files that are not released (the human annotators' label sheets):
 
 - the judge-human κ per workload and on all 200 items;
-- the uncontrolled-grid judge sweep and judge swap (`judge41_uncontrolled_*`);
 - the literature-audit coding.
 
 Their outputs are in the paper's supplementary data.
@@ -222,7 +222,7 @@ The recorded runs will be deposited on Zenodo (**DOI: 10.5281/zenodo.XXXXXXX**, 
 - the run manifests, result rows, judge verdicts and exclusion lists of the campaign (`data/results-campaign`);
 - the prepared question files the runs drew from.
 
-Whether the deposit will also hold the FinanceBench index the runs used, the uncontrolled-grid trees and the Sonnet smoke tree is not yet decided.
+Whether the deposit will also hold the FinanceBench index the runs used, the uncontrolled-grid trees (with the July sweep and the 27 March 2026 reruns) and the Sonnet smoke tree is not yet decided.
 
 Datasets keep their own licences (below), and files derived from a dataset keep its terms. Result rows quote questions, reference answers and predictions, and the prepared question files contain the full contexts.
 
