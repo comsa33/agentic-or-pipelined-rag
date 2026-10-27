@@ -4,7 +4,7 @@ Compares the per-question difference vectors (k-mean) of the two judges, recompu
 bootstrap with the cell's own comparison key, and counts changed verdicts per pipeline and k.
 Prints the result. No API call.
 
-    uv run python scripts/paper/j4_identical_delta.py
+    uv run python scripts/paper/judge_identical_delta.py
 """
 
 import collections

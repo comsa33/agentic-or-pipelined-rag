@@ -10,7 +10,7 @@ Reading only. The script needs both trees.
 script first checks that the 21 legacy patterns reproduce that file and then
 reports the cells that changed. Without it, only the new file is written.
 
-    uv run python scripts/paper/refusal_rates_v31.py
+    uv run python scripts/paper/uncontrolled_refusal_markers.py
 """
 
 import argparse

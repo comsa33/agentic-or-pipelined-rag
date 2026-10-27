@@ -10,24 +10,24 @@ computed. IRCoT does not run on Sonnet: every step call was refused in the
 smoke run.
 
 Questions dropped: the union of the grid exclusions.json and
-exclusions_f23.json for Sonnet on 2Wiki, from every pipeline and run.
+exclusions_budget_matched.json for Sonnet on 2Wiki, from every pipeline and run.
 
 Writes to scripts/paper/out/budget/:
 1. budget_matched_sonnet_contrasts.csv: Agentic - Loop(budget=10) and Loop(budget=10) - Loop
    (both pre-specified) per hop bin and over the dataset, F1 and Judge, with
-   the grid side as the per-question k1-3 mean (as in f2_f3.py) and, as a
+   the grid side as the per-question k1-3 mean (as in budget_and_external.py) and, as a
    sensitivity row, the grid k1 alone;
 2. budget_matched_sonnet_levels.csv: F1, Judge, metered calls and cost per question of
    Agentic, Loop and Loop(budget=10) on the paired questions;
 3. budget_matched_sonnet_summary.json: n, Holm sizes, rechecked cells, cost multiples,
    and the decision-rule reading available without Agentic(budget=6).
-Statistics as in f2_f3.py: paired bootstrap 10,000 (seed 42) from
+Statistics as in budget_and_external.py: paired bootstrap 10,000 (seed 42) from
 hop_level._paired_bootstrap with runs.comparison_rng, Holm within (family,
 metric) over the pre-specified contrasts in the hop cells (the dataset row is
 descriptive), p_holm in [0.04, 0.06] redrawn 10x. Calls = metered_calls.
 No API call; no prediction is printed.
 
-    uv run python scripts/paper/f2_sonnet.py
+    uv run python scripts/paper/budget_matched_sonnet.py
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "scripts" / "paper" / "out"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from f2_f3 import holm, sign_of, write_csv  # noqa: E402
+from budget_and_external import holm, sign_of, write_csv  # noqa: E402
 
 MODEL = "claude-sonnet-5-5"
 DS = "2wikimultihopqa"
@@ -85,8 +85,8 @@ def main() -> int:
 
     # exclusions: grid file and the budget-matched file, merged for this dataset and model
     grid_ex = excluded_ids(load_exclusions(results / "exclusions.json"), DS, MODEL)
-    f23_ex = excluded_ids(load_exclusions(results / "exclusions_f23.json"), DS, MODEL)
-    union = sorted(grid_ex | f23_ex)
+    budget_ex = excluded_ids(load_exclusions(results / "exclusions_budget_matched.json"), DS, MODEL)
+    union = sorted(grid_ex | budget_ex)
     stage = Path(tempfile.mkdtemp(prefix="f2sonnet_stage_"))
     for p in (*grid_dirs, results / F2_RUN):
         (stage / p.name).symlink_to(p)
@@ -98,7 +98,7 @@ def main() -> int:
                         {
                             "id": i,
                             "reason": "anthropic_refusal",
-                            "note": "union of exclusions.json and exclusions_f23.json",
+                            "note": "union of exclusions.json and exclusions_budget_matched.json",
                         }
                         for i in union
                     ]
@@ -236,7 +236,11 @@ def main() -> int:
         "model": MODEL,
         "dataset": DS,
         "judge": JUDGE,
-        "excluded": {"grid": sorted(grid_ex), "f23": sorted(f23_ex), "union_n": len(union)},
+        "excluded": {
+            "grid": sorted(grid_ex),
+            "budget_matched": sorted(budget_ex),
+            "union_n": len(union),
+        },
         "n_paired_all_three": len(common),
         "holm_m": holm_m,
         "rechecked_cells": sum("p_recheck" in r for r in rows),
@@ -252,7 +256,7 @@ def main() -> int:
             "max": int(loop10_m.max()),
             "rows_over_10": int((loop10_m > 10).sum()),
         },
-        "T2_available": {
+        "agentic_minus_loop10_sign_all_hops": {
             m: next(
                 r["sign"]
                 for r in rows
@@ -263,7 +267,7 @@ def main() -> int:
         },
         "not_computed": [
             "Agentic(budget=6) - Loop",
-            "Agentic(budget=6) - Agentic (b6 cell aborted)",
+            "Agentic(budget=6) - Agentic (six-call cell has no Sonnet result)",
             "Agentic - IRCoT, Loop - IRCoT (IRCoT not runnable on Sonnet)",
         ],
     }

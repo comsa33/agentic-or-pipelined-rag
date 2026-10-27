@@ -17,9 +17,9 @@ hop cells) are the script's own. It then
 Uses only the existing judged_gpt-4-1_39118f files; no API call; no
 prediction is printed.
 
-Run judge_gpt41_grid.py first (it writes judge_grid_contrasts_by_judge.csv).
+Run judge_grid.py first (it writes judge_grid_contrasts_by_judge.csv).
 
-    uv run python scripts/paper/mplus_gpt41.py
+    uv run python scripts/paper/judge_common_questions.py
 """
 
 from __future__ import annotations
@@ -49,11 +49,11 @@ def holm_sig(r: dict) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--code-repo", type=Path, default=REPO)
-    ap.add_argument("--out", type=Path, default=OUT / "judge_gpt41_grid")
+    ap.add_argument("--out", type=Path, default=OUT / "judge_grid")
     args = ap.parse_args()
     grid_script = Path(__file__).resolve().parent / "controlled_grid_analysis.py"
 
-    with tempfile.TemporaryDirectory(prefix="mplus_gpt41_") as tmp:
+    with tempfile.TemporaryDirectory(prefix="judge_common_questions_") as tmp:
         tmp = Path(tmp)
         subprocess.run(
             [
@@ -72,7 +72,7 @@ def main() -> int:
         main_rows = [
             r for r in read(tmp / "out/grid_f1_agentic_minus_loop.csv") if r["metric"] == "judge"
         ]
-        mplus_rows = [
+        common_rows = [
             r
             for r in read(tmp / "out/grid_f1_agentic_minus_loop_common_questions.csv")
             if r["metric"] == "judge"
@@ -109,7 +109,7 @@ def main() -> int:
     # 2. M+ next to main
     main_by = {tuple(r[k] for k in KEY): r for r in main_rows}
     out_rows = []
-    for r in mplus_rows:
+    for r in common_rows:
         d = main_by[tuple(r[k] for k in KEY)]
         out_rows.append(
             {
@@ -118,16 +118,16 @@ def main() -> int:
                 "hop": r["hop"],
                 "runs": r["runs"],
                 "descriptive": r["descriptive"],
-                "mplus_n": r["n"],
-                "mplus_judge_agentic": r["mean_a"],
-                "mplus_judge_loop": r["mean_b"],
-                "mplus_judge_delta": r["delta"],
-                "mplus_judge_ci_lo": r["ci_lo"],
-                "mplus_judge_ci_hi": r["ci_hi"],
-                "mplus_judge_p": r["p"],
-                "mplus_judge_p_holm_final": r["p_holm_final"],
-                "mplus_judge_holm_sig": holm_sig(r),
-                "mplus_judge_sign": r["sign"],
+                "common_n": r["n"],
+                "common_judge_agentic": r["mean_a"],
+                "common_judge_loop": r["mean_b"],
+                "common_judge_delta": r["delta"],
+                "common_judge_ci_lo": r["ci_lo"],
+                "common_judge_ci_hi": r["ci_hi"],
+                "common_judge_p": r["p"],
+                "common_judge_p_holm_final": r["p_holm_final"],
+                "common_judge_holm_sig": holm_sig(r),
+                "common_judge_sign": r["sign"],
                 "main_n": d["n"],
                 "main_judge_delta": d["delta"],
                 "main_judge_ci_lo": d["ci_lo"],

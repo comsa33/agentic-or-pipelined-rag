@@ -7,7 +7,7 @@ sample SD (ddof=1), whether the three share a sign, and the verdict
 `stable` (same sign and SD < |mean|) or `no reliable difference`. The nano rows
 reproduce grid_stability.csv of controlled_grid_analysis.py. No API call.
 
-    uv run python scripts/paper/stability_gpt41.py
+    uv run python scripts/paper/judge_stability.py
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ RUN_DIR = re.compile(
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--code-repo", type=Path, default=REPO)
-    ap.add_argument("--out", type=Path, default=OUT / "judge_gpt41_grid")
+    ap.add_argument("--out", type=Path, default=OUT / "judge_grid")
     args = ap.parse_args()
     code = args.code_repo.resolve()
     sys.path.insert(0, str(code))

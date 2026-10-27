@@ -12,7 +12,7 @@ run-time summaries score against the single `reference` instead.
 
 Exclusions: --exclusions grid (default) drops exclusions.json, which is what
 tab:rq1_main uses (its n row is checked below); --exclusions union also drops
-exclusions_f23.json (the budget-matched list), for comparison only.
+exclusions_budget_matched.json (the budget-matched list), for comparison only.
 
 F1 is computed in the same pass and the Agentic and Loop levels are checked
 against grid_f1_agentic_minus_loop.csv written by controlled_grid_analysis.py (run it
@@ -85,7 +85,7 @@ def main() -> int:
             (stage / p.name).symlink_to(p)
         merged: dict = {}
         for name in ("exclusions.json",) + (
-            ("exclusions_f23.json",) if args.exclusions == "union" else ()
+            ("exclusions_budget_matched.json",) if args.exclusions == "union" else ()
         ):
             for ds, by_model in json.loads((results / name).read_text(encoding="utf-8")).items():
                 if ds.startswith("_"):

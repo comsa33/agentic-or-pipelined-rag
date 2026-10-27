@@ -25,10 +25,10 @@ of Agentic and of Loop, i.e. on which side the refusals fall.
 
 Writes grid_sensitivity_declined_scored_wrong.csv and .tex (--mode asis: grid_sensitivity_declined_kept.csv and .tex) (layout of tab:rq1_main) to
 scripts/paper/out/robustness/. Reads the outputs of controlled_grid_analysis.py and
-judge_gpt41_grid.py (run them first). Reads only; no API call; no prediction
+judge_grid.py (run them first). Reads only; no API call; no prediction
 is printed.
 
-    uv run python scripts/paper/sens_f.py
+    uv run python scripts/paper/sensitivity_declined_scored_wrong.py
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ from controlled_grid_analysis import (  # noqa: E402
     sign_of,
     write_csv,
 )
-from sens_a_table import COLS, lvl, num  # noqa: E402
+from sensitivity_declined_removed import COLS, lvl, num  # noqa: E402
 
 JUDGE = "gpt-4-1_39118f"
 SONNET = "claude-sonnet-5-5"
@@ -113,7 +113,7 @@ def main() -> int:
     run_dirs = sorted(p for p in results.iterdir() if p.is_dir() and RUN_DIR.match(p.name))
     if len(run_dirs) != 24:
         raise SystemExit(f"expected 24 run directories, found {len(run_dirs)}")
-    stage = Path(tempfile.mkdtemp(prefix="sens_f_stage_"))
+    stage = Path(tempfile.mkdtemp(prefix="sensitivity_stage_"))
     try:
         for p in run_dirs:
             (stage / p.name).symlink_to(p)
@@ -206,7 +206,7 @@ def main() -> int:
                             "metric": metric,
                             "dataset": ds,
                             "hop": hop,
-                            "n_F": len(qids),
+                            "n_scored_wrong": len(qids),
                             "kept_in_questions": len(kept_in),
                             "zero_agentic_runs": sum(
                                 zero_filled[(model, ds, AGENTIC, q)] for q in kept_in
@@ -214,13 +214,13 @@ def main() -> int:
                             "zero_loop_runs": sum(
                                 zero_filled[(model, ds, LOOP, q)] for q in kept_in
                             ),
-                            "agentic_F": float(a.mean()),
-                            "loop_F": float(b.mean()),
-                            "delta_F": obs,
-                            "ci_lo_F": lo,
-                            "ci_hi_F": hi,
-                            "p_F": p,
-                            "stability_F": "stable"
+                            "agentic_scored_wrong": float(a.mean()),
+                            "loop_scored_wrong": float(b.mean()),
+                            "delta_scored_wrong": obs,
+                            "ci_lo_scored_wrong": lo,
+                            "ci_hi_scored_wrong": hi,
+                            "p_scored_wrong": p,
+                            "stability_scored_wrong": "stable"
                             if (sd < abs(np.mean(per_run)) and same)
                             else "no reliable difference",
                             "descriptive": descriptive_only(ds, hop, metric),
@@ -231,23 +231,27 @@ def main() -> int:
                     )
     for metric in ("f1", "judge"):
         g = [r for r in rows if r["metric"] == metric and not r["descriptive"]]
-        for r, adj in zip(g, holm([x["p_F"] for x in g])):
-            r["p_holm_F"] = adj
+        for r, adj in zip(g, holm([x["p_scored_wrong"] for x in g])):
+            r["p_holm_scored_wrong"] = adj
         for r in g:
-            if 0.04 <= r["p_holm_F"] <= 0.06:
-                r["p_recheck_F"] = _paired_bootstrap(
+            if 0.04 <= r["p_holm_scored_wrong"] <= 0.06:
+                r["p_recheck_scored_wrong"] = _paired_bootstrap(
                     r["_a"], r["_b"], comparison_rng(SEED, *r["_key"]), n_boot=10 * N_BOOT
                 )[0]
-        for r, adj in zip(g, holm([x.get("p_recheck_F", x["p_F"]) for x in g])):
-            r["p_holm_final_F"] = adj
+        for r, adj in zip(
+            g, holm([x.get("p_recheck_scored_wrong", x["p_scored_wrong"]) for x in g])
+        ):
+            r["p_holm_final_scored_wrong"] = adj
     for r in rows:
-        r["sign_F"] = sign_of(r["delta_F"], r["ci_lo_F"], r["ci_hi_F"])
+        r["sign_scored_wrong"] = sign_of(
+            r["delta_scored_wrong"], r["ci_lo_scored_wrong"], r["ci_hi_scored_wrong"]
+        )
 
     # main-table values under gpt-4.1 for the comparison column
     main = {}
     for path, judge_col in (
         (OUT / "controlled_grid" / "grid_f1_agentic_minus_loop.csv", None),
-        (OUT / "judge_gpt41_grid" / "judge_grid_contrasts_by_judge.csv", "gpt41"),
+        (OUT / "judge_grid" / "judge_grid_contrasts_by_judge.csv", "gpt41"),
     ):
         with open(path) as fh:
             for r in csv.DictReader(fh):
@@ -275,13 +279,15 @@ def main() -> int:
                 "p_holm_final_main": "" if r["descriptive"] else ph,
             }
         )
-        if r["model"] != SONNET and (n != r["n_F"] or abs(d - r["delta_F"]) > 1e-9):
+        if r["model"] != SONNET and (
+            n != r["n_scored_wrong"] or abs(d - r["delta_scored_wrong"]) > 1e-9
+        ):
             raise SystemExit(
                 f"gpt-5-mini row differs from the main table: {r['metric']} {r['dataset']} {r['hop']}"
             )
-        r["sign_change"] = r["sign_F"] != s
+        r["sign_change"] = r["sign_scored_wrong"] != s
         r["holm_change"] = (not r["descriptive"]) and (
-            (r["p_holm_final_F"] < 0.05) != (float(ph) < 0.05)
+            (r["p_holm_final_scored_wrong"] < 0.05) != (float(ph) < 0.05)
         )
     args.out.mkdir(parents=True, exist_ok=True)
     write_csv(args.out / f"{stem}.csv", rows)
@@ -289,7 +295,7 @@ def main() -> int:
     by = {(r["model"], r["metric"], r["dataset"], str(r["hop"])): r for r in rows}
     lines = [
         "% Sensitivity F (provider-declined Sonnet questions scored 0) in the layout of tab:rq1_main.",
-        "% Generated by scripts/paper/sens_f.py. Do not edit by hand.",
+        "% Generated by scripts/paper/sensitivity_declined_scored_wrong.py. Do not edit by hand.",
         "\\begin{tabular}{ll ccccccc}",
         "\\toprule",
         "& & \\textbf{HotpotQA} & \\multicolumn{2}{c}{\\textbf{2WikiMultiHopQA}} & \\multicolumn{3}{c}{\\textbf{MuSiQue}} & \\textbf{FinanceBench} \\\\",
@@ -300,7 +306,7 @@ def main() -> int:
         lines += ["\\midrule", f"\\multirow{{7}}{{*}}{{{LABEL[model]}}}"]
         lines.append(
             " & $n$ & "
-            + " & ".join(str(by[(model, "f1", ds, h)]["n_F"]) for ds, h in COLS)
+            + " & ".join(str(by[(model, "f1", ds, h)]["n_scored_wrong"]) for ds, h in COLS)
             + " \\\\"
         )
         for metric, mlabel in (("f1", "F1"), ("judge", "Judge")):
@@ -311,24 +317,28 @@ def main() -> int:
             ]
             lines.append(
                 f" & {mlabel} \\agentic{{}} & "
-                + " & ".join(lvl(c["agentic_F"]) + g for c, g in zip(cells, dag))
+                + " & ".join(lvl(c["agentic_scored_wrong"]) + g for c, g in zip(cells, dag))
                 + " \\\\"
             )
             lines.append(
                 f" & {mlabel} Loop & "
-                + " & ".join(lvl(c["loop_F"]) + g for c, g in zip(cells, dag))
+                + " & ".join(lvl(c["loop_scored_wrong"]) + g for c, g in zip(cells, dag))
                 + " \\\\"
             )
             parts = []
             for c, g in zip(cells, dag):
-                star = "^{*}" if (not c["descriptive"] and c["p_holm_final_F"] < 0.05) else ""
-                stab = "s" if c["stability_F"] == "stable" else "u"
+                star = (
+                    "^{*}"
+                    if (not c["descriptive"] and c["p_holm_final_scored_wrong"] < 0.05)
+                    else ""
+                )
+                stab = "s" if c["stability_scored_wrong"] == "stable" else "u"
                 body = (
-                    f"${num(c['delta_F'])}{star}$ [${num(c['ci_lo_F'])}$, ${num(c['ci_hi_F'])}$]"
+                    f"${num(c['delta_scored_wrong'])}{star}$ [${num(c['ci_lo_scored_wrong'])}$, ${num(c['ci_hi_scored_wrong'])}$]"
                     f"$^{{\\mathrm{{{stab}}}}}${g}"
                 )
                 # Bold: a tested cell whose 95% CI excludes zero (never a descriptive one).
-                bold = c["sign_F"] in ("+", "-") and not c["descriptive"]
+                bold = c["sign_scored_wrong"] in ("+", "-") and not c["descriptive"]
                 parts.append(f"{{\\bfseries\\boldmath {body}}}" if bold else body)
             lines.append(
                 f" & {mlabel} $\\Delta$ [95\\% CI]\n   & " + "\n   & ".join(parts) + " \\\\"
@@ -343,11 +353,11 @@ def main() -> int:
     for r in rows:
         if r["model"] == SONNET:
             print(
-                f"{r['metric']:5s} {r['dataset'][:8]:8s} {r['hop']} n {r['n_main']}->{r['n_F']} "
+                f"{r['metric']:5s} {r['dataset'][:8]:8s} {r['hop']} n {r['n_main']}->{r['n_scored_wrong']} "
                 f"zeros A/L {r['zero_agentic_runs']}/{r['zero_loop_runs']} "
-                f"d {r['delta_main']:+.4f}->{r['delta_F']:+.4f} [{r['ci_lo_F']:+.4f},{r['ci_hi_F']:+.4f}] "
-                f"sign {r['sign_main']}->{r['sign_F']} holm {r['p_holm_final_main'] or '-'}->"
-                f"{'' if r['descriptive'] else round(r['p_holm_final_F'], 4)}"
+                f"d {r['delta_main']:+.4f}->{r['delta_scored_wrong']:+.4f} [{r['ci_lo_scored_wrong']:+.4f},{r['ci_hi_scored_wrong']:+.4f}] "
+                f"sign {r['sign_main']}->{r['sign_scored_wrong']} holm {r['p_holm_final_main'] or '-'}->"
+                f"{'' if r['descriptive'] else round(r['p_holm_final_scored_wrong'], 4)}"
                 + (" CHANGE" if r["sign_change"] or r["holm_change"] else "")
             )
     return 0

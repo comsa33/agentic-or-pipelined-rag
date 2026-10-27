@@ -12,7 +12,7 @@ fields). The run log records no refusal lines. No API call; no prediction.
 Needs the smoke tree data/results-smoke-f23-sonnet; prints a note and stops
 without it.
 
-    uv run python scripts/paper/f3_smoke_refusals.py
+    uv run python scripts/paper/external_smoke_refusals.py
 """
 
 import json

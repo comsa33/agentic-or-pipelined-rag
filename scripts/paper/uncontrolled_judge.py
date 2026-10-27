@@ -3,9 +3,7 @@
 
 1. FinanceBench visibility sweep (Gemini, n=150, table tab:threat_budget): per
    point, F1 and the judge score under both judges, with Agentic-Naive and
-   Loop-Naive paired differences (delta, 95% CI, standard two-sided p). The
-   published_p column holds the p an earlier version of the table printed for
-   Agentic-Naive.
+   Loop-Naive paired differences (delta, 95% CI, standard two-sided p).
 2. Judge swap (Section 5.4): per model-workload cell of the uncontrolled grid,
    whether the sign of the Agentic-Loop judge difference agrees between the
    reference judge and minimax-m3, with nano and gpt-4.1 each as reference.
@@ -59,20 +57,11 @@ POINTS = (
     (10, "10 / 10"),
     (20, "20 / 20"),
     (30, "30 / 30"),
-    (50, "50 / 30 (reported)"),
+    (50, "50 / 30"),
 )
 GPT41 = "gpt-4-1_39118f"
 NANO_SWEEP = "gpt-4-1-nano_7bcf05"
 SEED, N_BOOT = 42, 10000
-
-# p (Agentic-Naive) as an earlier version of the table printed it.
-PUBLISHED_P_AN = {
-    5: {"f1": "<.001", "nano": "<.001"},
-    10: {"f1": "<.001", "nano": "<.001"},
-    20: {"f1": ".130", "nano": ".193"},
-    30: {"f1": ".002", "nano": ".034"},
-    50: {"f1": ".055", "nano": ".121"},
-}
 
 
 def _rows(path: Path) -> dict[str, dict]:
@@ -132,9 +121,6 @@ def sweep() -> list[dict]:
                         "ci_lo": lo,
                         "ci_hi": hi,
                         "p": p,
-                        "published_p": PUBLISHED_P_AN[k].get(metric, "")
-                        if contrast == "A-N"
-                        else "",
                     }
                 )
     return out

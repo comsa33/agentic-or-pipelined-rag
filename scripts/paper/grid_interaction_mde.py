@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Family x pattern interaction and gpt-5-mini equivalence on the controlled grid (no API call).
+"""Family x pattern interaction and gpt-5-mini minimum detectable effect on the controlled grid (no API call).
 
 1. Model family x pattern interaction. Per cell (workload, hop bin) and on the
    questions both families kept (M+: each dataset minus the union of the two
@@ -14,19 +14,17 @@
    p_holm in [0.04, 0.06] is redrawn with 10x the draws.
    Each family's own M+ Delta is checked against grid_f1_agentic_minus_loop_common_questions.csv
    (F1) and judge_grid_common_questions.csv (judge).
-2. Minimum detectable effect and equivalence for gpt-5-mini, on the main
+2. Minimum detectable effect for gpt-5-mini, on the main
    question set of the main table (the family's own exclusions only) and with the
    bootstrap draws of that table itself (same comparison key, so the 95%
    interval reproduces the table). MDE = (z_.975 + z_.80) x bootstrap SE.
-   TOST at alpha .05 with margins +-0.03 and +-0.05: equivalent when the 90%
-   bootstrap interval lies inside (-margin, +margin); p_TOST is the larger of
-   the two one-sided bootstrap shares beyond the margins.
+   Written per cell: n, delta, bootstrap SE and MDE.
 
 Writes grid_interaction.csv and grid_mde_gpt5mini.csv to
 scripts/paper/out/robustness/. Reads the outputs of controlled_grid_analysis.py
-and mplus_gpt41.py (run them first). Reads only.
+and judge_common_questions.py (run them first). Reads only.
 
-    uv run python scripts/paper/interaction_equivalence.py
+    uv run python scripts/paper/grid_interaction_mde.py
 """
 
 from __future__ import annotations
@@ -184,11 +182,11 @@ def main() -> int:
                     float(r["delta"]),
                     int(r["n"]),
                 )
-    with open(OUT / "judge_gpt41_grid" / "judge_grid_common_questions.csv") as fh:
+    with open(OUT / "judge_grid" / "judge_grid_common_questions.csv") as fh:
         for r in csv.DictReader(fh):
             mplus[("judge", r["model"], r["dataset"], int(r["hop"]))] = (
-                float(r["mplus_judge_delta"]),
-                int(r["mplus_n"]),
+                float(r["common_judge_delta"]),
+                int(r["common_n"]),
             )
     checked = 0
     for r in rows:
@@ -228,29 +226,21 @@ def main() -> int:
                     "hop": hop,
                     "n": len(qids),
                     "delta": float(d.mean()),
-                    "ci95_lo": lo95,
-                    "ci95_hi": hi95,
-                    "ci90_lo": float(np.percentile(boot, 5)),
-                    "ci90_hi": float(np.percentile(boot, 95)),
                     "boot_se": se,
                     "mde_80": (Z_975 + Z_80) * se,
                     "descriptive": descriptive_only(ds, hop, metric),
                 }
-                for m in (0.03, 0.05):
-                    p_tost = max(float(np.mean(boot <= -m)), float(np.mean(boot >= m)))
-                    row[f"tost_p_{m:.2f}"] = p_tost
-                    row[f"equivalent_{m:.2f}"] = row["ci90_lo"] > -m and row["ci90_hi"] < m
                 eq_rows.append(row)
     write_csv(out / "grid_mde_gpt5mini.csv", eq_rows)
     print(
         json.dumps(
             {
                 "interaction_rows": len(rows),
-                "mplus_deltas_checked": checked,
+                "common_deltas_checked": checked,
                 "holm_sig": [
                     (r["metric"], r["dataset"], r["hop"]) for r in rows if r.get("holm_sig")
                 ],
-                "equivalence_rows": len(eq_rows),
+                "mde_rows": len(eq_rows),
             },
             indent=1,
         )

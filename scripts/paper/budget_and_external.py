@@ -27,7 +27,7 @@ MuSiQue 4-hop, the FB judge and the exploratory contrast are descriptive.
 Cells with p_holm in [0.04, 0.06] are redrawn 10x. Latency is not read.
 Calls are `metered_calls`. No API call; no prediction is printed.
 
-    uv run python scripts/paper/f2_f3.py
+    uv run python scripts/paper/budget_and_external.py
 """
 
 from __future__ import annotations

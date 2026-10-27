@@ -159,7 +159,7 @@ Some outputs also need the uncontrolled-grid trees (`data/results/paper`, `data/
 - `instances_evaluation_tool.csv`, `instances_structure_tools.csv` and `instances_all_variants.csv`, the agent variants of the uncontrolled grid (`data/results/paper` and the 27 March 2026 reruns in `data/results`);
 - `uncontrolled_budget_sweep_by_judge.csv` and `uncontrolled_judge_swap.csv`, the uncontrolled-grid judge sweep and judge swap, from the verdicts stored in those trees (all three uncontrolled trees);
 - `context_budget.csv` (uncontrolled trees). `run_all.sh` does not make it. Run `uv run python -m experiments.analysis.context_budget --csv <file>`;
-- the refusal counts printed by `f3_smoke_refusals.py` (smoke tree).
+- the refusal counts printed by `external_smoke_refusals.py` (smoke tree).
 
 The following are results only, because they need files that are not released (the human annotators' label sheets):
 

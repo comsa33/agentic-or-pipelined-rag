@@ -22,7 +22,7 @@ script uses, so the nano rows reproduce its Judge table. Holm runs within
 data as judge_vs_human_rows.csv. --published defaults to the
 grid_f1_agentic_minus_loop.csv of controlled_grid_analysis.py (run it first).
 
-    uv run python scripts/paper/judge_gpt41_grid.py --hedge <judge_vs_human_rows.csv>
+    uv run python scripts/paper/judge_grid.py --hedge <judge_vs_human_rows.csv>
 """
 
 from __future__ import annotations
@@ -102,7 +102,7 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--code-repo", type=Path, default=REPO)
-    ap.add_argument("--out", type=Path, default=OUT / "judge_gpt41_grid")
+    ap.add_argument("--out", type=Path, default=OUT / "judge_grid")
     ap.add_argument(
         "--hedge", type=Path, required=True, help="judge_vs_human_rows.csv (human labels)"
     )
