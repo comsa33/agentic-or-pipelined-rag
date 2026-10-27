@@ -48,7 +48,7 @@ A run names the slot it may spend with `ANTHROPIC_KEY_SLOT=1`. The manifest reco
 
 ## Prepare the data
 
-The runs drew their questions from these files with seed 42 (200 per multi-hop workload, all 150 for FinanceBench). HotpotQA is prepared in full (7,405 validation questions). 2WikiMultiHopQA and MuSiQue keep their first 500 questions. Each file is also the retrieval corpus of its workload.
+The runs drew their questions from these files with seed 42 (200 per multi-hop workload, all 150 for FinanceBench). HotpotQA is prepared in full (7,405 validation questions). 2WikiMultiHopQA keeps its first 500 questions, and MuSiQue its first 500 answerable questions (`prepare_datasets.py` drops the unanswerable ones before taking 500). Each file is also the retrieval corpus of its workload.
 
 ```bash
 uv run python scripts/prepare_datasets.py --dataset hotpotqa
@@ -67,7 +67,7 @@ EMBEDDING_MODEL=all-MiniLM-L6-v2 uv run python scripts/build_index.py --dataset 
 
 The default `EMBEDDING_MODEL` in the code is `text-embedding-3-small` (OpenAI, paid). The paper used `all-MiniLM-L6-v2`, which runs locally. `.env.example` sets it.
 
-**FinanceBench passage titles.** While building the FinanceBench index, `build_index.py` asks `PREPROCESS_MODEL` to name the section of each of the 168 evidence pages. The passage title is `<document> — <section>`, and titles appear in the passages shown to the models. Retrieval scores only the passage text, so the ranking does not depend on them. A rebuild gives different titles from the index the runs used, so the FinanceBench prompts will differ from the recorded ones unless that index is used. The other three indices are rebuilt exactly from the files above.
+**FinanceBench passage titles.** While building the FinanceBench index, `build_index.py` asks `PREPROCESS_MODEL` (an LLM) to name the section of each evidence page, and the passage title is `<document> — <section>`. Retrieval scores only the passage text, so the titles are not used for the ranking. The other three indices are rebuilt from the same passages as the indices the runs used.
 
 ## Run one cell of the controlled grid
 
@@ -153,12 +153,19 @@ Their outputs are in the paper's supplementary data.
 
 Each run's manifest records the commit of the development repository the run was made from (`git.commit`). The campaign used five commits: `6c307f3`, `d24f8d5`, `27542f9`, `cac25e4` and `cc845ba`. That repository is not public.
 
-This repository is the same code with the following changes:
+This repository is the final state of the development code (`a0d70e0`, made after the last run) with the following changes:
 
 - names, comments and documentation tidied;
 - unused modules removed (prompt optimisation, an old human-evaluation sheet, old analyses, PopQA, Natural Questions and Wikipedia loaders);
-- an import cycle in `agentic_rag/tools` fixed;
-- the per-configuration settings record (manifest version 2) added.
+- an import cycle in `agentic_rag/tools` fixed.
+
+Against the run commits, later development commits changed:
+
+- for every run commit: the run manifest (version 2 adds the per-configuration settings record), the validator and the run driver that writes the manifest;
+- for the two runs at `cac25e4`: how the runner records a refused answer (an empty string instead of `None`; the analysis reads both as empty);
+- for the runs at `6c307f3` (gpt-5-mini): the runner's error classification, resume rules and per-row usage fields, the Anthropic client (not used by those runs) and several analysis modules.
+
+The pipelines, retriever, signatures and tools are the same at all five commits.
 
 Every string that reaches a model prompt is identical to each of the five commits:
 

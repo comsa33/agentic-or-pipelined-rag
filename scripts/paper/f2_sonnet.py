@@ -83,7 +83,7 @@ def main() -> int:
     if len(grid_dirs) != 3 or not (results / F2_RUN).is_dir():
         raise SystemExit(f"expected 3 grid runs and {F2_RUN}, found {len(grid_dirs)}")
 
-    # exclusions: grid file and the F2/F3 file, merged for this dataset and model
+    # exclusions: grid file and the budget-matched file, merged for this dataset and model
     grid_ex = excluded_ids(load_exclusions(results / "exclusions.json"), DS, MODEL)
     f23_ex = excluded_ids(load_exclusions(results / "exclusions_f23.json"), DS, MODEL)
     union = sorted(grid_ex | f23_ex)
@@ -264,7 +264,7 @@ def main() -> int:
         "not_computed": [
             "Agentic(budget=6) - Loop",
             "Agentic(budget=6) - Agentic (b6 cell aborted)",
-            "F3 Agentic - IRCoT, Loop - IRCoT (IRCoT not runnable on Sonnet)",
+            "Agentic - IRCoT, Loop - IRCoT (IRCoT not runnable on Sonnet)",
         ],
     }
     (out / "f2_sonnet_summary.json").write_text(

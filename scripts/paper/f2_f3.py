@@ -15,8 +15,8 @@ writes to scripts/paper/out/budget/:
 5. ircot_fallback.csv: JSONAdapter re-sends per IRCoT run;
 6. verdicts.json: the decision rules read off the tables.
 
-The family column keeps the labels of the supplementary data (F2 = budget-
-matched, F3 = external IRCoT). Statistics follow the controlled-grid scripts:
+The family column is matched_budget or external_instance (F2 and F3 in the
+bootstrap keys). Statistics follow the controlled-grid scripts:
 per question the mean over that pipeline's k runs, then a paired bootstrap
 (10,000, seed 42) from `hop_level._paired_bootstrap` with
 `runs.comparison_rng`. Grid and budget-matched runs are different runs of the
@@ -77,6 +77,9 @@ F2 = (
     (AGENTIC6, AGENTIC, False),
 )
 F3 = ((AGENTIC, IRCOT, True), (LOOP, IRCOT, True))
+# Output names of the two families. The short labels F2/F3 stay in the
+# comparison_rng keys, so the bootstrap draws do not change.
+FAMILY_NAME = {"F2": "matched_budget", "F3": "external_instance"}
 F2_DATASETS = ("2wikimultihopqa", "financebench")
 RUN_DIR = re.compile(
     r"^\d{8}_\d{6}_(rq1|budget_matched|external)_(hotpotqa|2wikimultihopqa|musique|financebench)"
@@ -213,7 +216,7 @@ def main() -> int:
                         sd = float(diff.std(ddof=1))
                         rows.append(
                             {
-                                "family": family,
+                                "family": FAMILY_NAME[family],
                                 "dataset": ds,
                                 "hop": hop,
                                 "metric": metric,
@@ -280,7 +283,7 @@ def main() -> int:
                 for p in pipes:
                     levels.append(
                         {
-                            "table": table,
+                            "table": FAMILY_NAME[table],
                             "dataset": ds,
                             "hop": hop,
                             "pipeline": SHORT[p],
@@ -393,7 +396,7 @@ def main() -> int:
         "f2_rows": len(f2),
         "f3_rows": len(f3),
         "holm_m": {
-            f"{fam}_{m}": next(
+            f"{FAMILY_NAME[fam]}_{m}": next(
                 (r["holm_m"] for r in rows if r["metric"] == m and r["holm_m"] != ""), 0
             )
             for fam, rows in (("F2", f2), ("F3", f3))
