@@ -5,7 +5,7 @@ Reads the 24 controlled-grid runs twice (gpt-4.1-nano and gpt-4.1 tags) and, per
 (model, dataset, hop) cell, reports the three per-run differences, their mean,
 sample SD (ddof=1), whether the three share a sign, and the verdict
 `stable` (same sign and SD < |mean|) or `no reliable difference`. The nano rows
-reproduce f6_stability.csv of controlled_grid_analysis.py. No API call.
+reproduce grid_stability.csv of controlled_grid_analysis.py. No API call.
 
     uv run python scripts/paper/stability_gpt41.py
 """

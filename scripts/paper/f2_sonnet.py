@@ -13,13 +13,13 @@ Questions dropped: the union of the grid exclusions.json and
 exclusions_f23.json for Sonnet on 2Wiki, from every pipeline and run.
 
 Writes to scripts/paper/out/budget/:
-1. f2_sonnet_contrasts.csv: Agentic - Loop(budget=10) and Loop(budget=10) - Loop
+1. budget_matched_sonnet_contrasts.csv: Agentic - Loop(budget=10) and Loop(budget=10) - Loop
    (both pre-specified) per hop bin and over the dataset, F1 and Judge, with
    the grid side as the per-question k1-3 mean (as in f2_f3.py) and, as a
    sensitivity row, the grid k1 alone;
-2. f2_sonnet_levels.csv: F1, Judge, metered calls and cost per question of
+2. budget_matched_sonnet_levels.csv: F1, Judge, metered calls and cost per question of
    Agentic, Loop and Loop(budget=10) on the paired questions;
-3. f2_sonnet_summary.json: n, Holm sizes, rechecked cells, cost multiples,
+3. budget_matched_sonnet_summary.json: n, Holm sizes, rechecked cells, cost multiples,
    and the decision-rule reading available without Agentic(budget=6).
 Statistics as in f2_f3.py: paired bootstrap 10,000 (seed 42) from
 hop_level._paired_bootstrap with runs.comparison_rng, Holm within (family,
@@ -212,7 +212,7 @@ def main() -> int:
             r["p_holm_final"] = adj
             r["holm_sig"] = adj < 0.05
         holm_m[metric] = len(g)
-    write_csv(out / "f2_sonnet_contrasts.csv", rows)
+    write_csv(out / "budget_matched_sonnet_contrasts.csv", rows)
 
     levels = []
     common = qids_of(AGENTIC, LOOP, LOOP10)
@@ -228,7 +228,7 @@ def main() -> int:
                     **{m: float(arr(m, p, qids, "k1-3").mean()) for m in metrics},
                 }
             )
-    write_csv(out / "f2_sonnet_levels.csv", levels)
+    write_csv(out / "budget_matched_sonnet_levels.csv", levels)
 
     lv = {(r["hop"], r["pipeline"]): r for r in levels}
     loop10_m = np.array(list(val["metered"][LOOP10][1].values()))
@@ -267,7 +267,7 @@ def main() -> int:
             "Agentic - IRCoT, Loop - IRCoT (IRCoT not runnable on Sonnet)",
         ],
     }
-    (out / "f2_sonnet_summary.json").write_text(
+    (out / "budget_matched_sonnet_summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8"
     )
     print(json.dumps(summary, indent=2))

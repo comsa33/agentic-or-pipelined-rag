@@ -14,8 +14,8 @@
 
 Reads the stored verdicts (`*_judged_*.jsonl`) of data/results/paper,
 data/results-openweight/final and the July sweep run in data/results-topk.
-No API call. Writes judge41_uncontrolled_table6_1_sweep_by_judge.csv and
-judge41_uncontrolled_judge_swap_by_reference.csv to
+No API call. Writes uncontrolled_budget_sweep_by_judge.csv and
+uncontrolled_judge_swap.csv to
 scripts/paper/out/uncontrolled_judge/.
 
     uv run python scripts/paper/uncontrolled_judge.py
@@ -186,8 +186,8 @@ for tree in (PAPER, OPENWEIGHT, SWEEP):
 
 s, w = sweep(), swap()
 args.out_dir.mkdir(parents=True, exist_ok=True)
-write_csv(args.out_dir / "judge41_uncontrolled_table6_1_sweep_by_judge.csv", s)
-write_csv(args.out_dir / "judge41_uncontrolled_judge_swap_by_reference.csv", w)
+write_csv(args.out_dir / "uncontrolled_budget_sweep_by_judge.csv", s)
+write_csv(args.out_dir / "uncontrolled_judge_swap.csv", w)
 summary = {
     "sweep_points": len(s),
     "swap_cells": len(w),

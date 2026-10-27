@@ -583,11 +583,16 @@ def main() -> int:
             drop_m[(model, ds)] = union - excluded_ids(exclusions, ds, model)
     mplus = suite(drop_m)
 
-    for name, s in (("main", main), ("A", sens_a), ("r2_ac786909", sens_r2), ("mplus", mplus)):
+    for name, s in (
+        ("main", main),
+        ("declined_removed", sens_a),
+        ("ac786909_removed", sens_r2),
+        ("common_questions", mplus),
+    ):
         suffix = "" if name == "main" else f"_{name}"
-        write_csv(out / f"f1_agentic_minus_loop{suffix}.csv", s["f1"])
-        write_csv(out / f"f6_stability{suffix}.csv", s["f6"])
-        write_csv(out / f"f5_refusal{suffix}.csv", s["f5"])
+        write_csv(out / f"grid_f1_agentic_minus_loop{suffix}.csv", s["f1"])
+        write_csv(out / f"grid_stability{suffix}.csv", s["f6"])
+        write_csv(out / f"grid_refusal_markers{suffix}.csv", s["f5"])
 
     def changes(d_rows: list[dict], o_rows: list[dict], key, kind: str) -> list[dict]:
         """Cells whose verdict differs between two tables of the same shape."""
@@ -641,7 +646,7 @@ def main() -> int:
         "f5": changes(main["f5"], sens_a["f5"], k_f5, "f5"),
     }
     write_csv(
-        out / "sensitivity_A_changed_cells.csv",
+        out / "sensitivity_declined_removed_changed_cells.csv",
         [
             {
                 "table": t,
@@ -692,7 +697,7 @@ def main() -> int:
                             else float("nan"),
                         }
                     )
-    write_csv(out / "exploratory_answer_form.csv", expl_rows)
+    write_csv(out / "grid_answer_form.csv", expl_rows)
 
     # ---- cost / latency --------------------------------------------------
     cost_rows: list[dict] = []
@@ -746,7 +751,7 @@ def main() -> int:
             c[f"agentic_over_loop_{name}"] = (
                 ag[src] / lp[src] if ag and lp and lp[src] == lp[src] and lp[src] else float("nan")
             )
-    write_csv(out / "cost_latency.csv", cost_rows)
+    write_csv(out / "grid_cost_latency.csv", cost_rows)
 
     # ---- refusal-propensity axis: naive RAG, 2Wiki, refusal-marker rate ----
     from experiments.analysis.runs import load_runs as _load_runs
@@ -802,11 +807,11 @@ def main() -> int:
     for group in (axis_rows, march):
         for rank, r in enumerate(sorted(group, key=lambda x: -x["refusal_rate"]), 1):
             r["rank_in_source"] = rank
-    write_csv(out / "refusal_axis.csv", axis_rows + march)
+    write_csv(out / "grid_refusal_axis.csv", axis_rows + march)
 
-    # ---- refusal-pattern recount (c4_recount_*) ---------------------------
+    # ---- refusal-pattern recount (refusal_pattern_recount_*) ---------------------------
     gpt_dirs = [str(p) for p in run_dirs if "_gpt-5-mini_" in p.name]
-    c4_csv = out / "c4_recount_changed_rows.csv"
+    c4_csv = out / "refusal_pattern_recount_changed_rows.csv"
     proc = subprocess.run(
         [
             sys.executable,
@@ -823,7 +828,7 @@ def main() -> int:
     c4_summary = "\n".join(
         line for line in proc.stdout.splitlines() if not line.startswith("  ")
     ).strip()
-    (out / "c4_recount_summary.txt").write_text(c4_summary + "\n", encoding="utf-8")
+    (out / "refusal_pattern_recount_summary.txt").write_text(c4_summary + "\n", encoding="utf-8")
 
     (out / "preflight.json").write_text(
         json.dumps(pre, indent=2, ensure_ascii=False, default=str), encoding="utf-8"

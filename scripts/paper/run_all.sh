@@ -3,17 +3,17 @@
 #
 # Needs data/results-campaign and data/raw (see README, Data and analysis).
 # The human-labelled rows for judge_gpt41_grid.py are the supplementary file
-# judge41_vs_human_hedge167_rows.csv; pass its path as the first argument.
+# judge_vs_human_rows.csv; pass its path as the first argument.
 # Parts that read the uncontrolled trees (data/results/paper,
 # data/results-openweight/final, data/results-topk) or the Sonnet smoke tree
 # run only when those trees are present. Everything is written to scripts/paper/out/. No API call.
 #
 # Usage:
-#   scripts/paper/run_all.sh <judge41_vs_human_hedge167_rows.csv>
+#   scripts/paper/run_all.sh <judge_vs_human_rows.csv>
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-HEDGE="${1:?usage: $0 <judge41_vs_human_hedge167_rows.csv>}"
+HEDGE="${1:?usage: $0 <judge_vs_human_rows.csv>}"
 run() { echo "== $*"; uv run python "scripts/paper/$1" "${@:2}"; }
 
 run controlled_grid_analysis.py

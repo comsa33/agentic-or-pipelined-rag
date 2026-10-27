@@ -15,7 +15,7 @@ tab:rq1_main uses (its n row is checked below); --exclusions union also drops
 exclusions_f23.json (the budget-matched list), for comparison only.
 
 F1 is computed in the same pass and the Agentic and Loop levels are checked
-against f1_agentic_minus_loop.csv written by controlled_grid_analysis.py (run it
+against grid_f1_agentic_minus_loop.csv written by controlled_grid_analysis.py (run it
 first). Writes scripts/paper/out/controlled_grid_em_rouge.csv. Reads only; no
 API call; no prediction is printed.
 
@@ -152,7 +152,7 @@ def main() -> int:
 
     # F1 check against the main-table source (Agentic and Loop levels, k1-3)
     if args.exclusions == "grid":
-        src = args.grid_dir / "f1_agentic_minus_loop.csv"
+        src = args.grid_dir / "grid_f1_agentic_minus_loop.csv"
         with open(src, encoding="utf-8") as fh:
             ref_rows = [r for r in csv.DictReader(fh) if r["metric"] == "f1"]
         lv = {(r["model"], r["dataset"], r["hop"], r["pipeline"]): r["f1"] for r in rows}

@@ -19,10 +19,10 @@ script uses, so the nano rows reproduce its Judge table. Holm runs within
 (judge, contrast) over the non-descriptive hop cells. No API call.
 
 --hedge is the 167 human-labelled rows, published with the supplementary
-data as judge41_vs_human_hedge167_rows.csv. --published defaults to the
-f1_agentic_minus_loop.csv of controlled_grid_analysis.py (run it first).
+data as judge_vs_human_rows.csv. --published defaults to the
+grid_f1_agentic_minus_loop.csv of controlled_grid_analysis.py (run it first).
 
-    uv run python scripts/paper/judge_gpt41_grid.py --hedge <judge41_vs_human_hedge167_rows.csv>
+    uv run python scripts/paper/judge_gpt41_grid.py --hedge <judge_vs_human_rows.csv>
 """
 
 from __future__ import annotations
@@ -103,12 +103,14 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--code-repo", type=Path, default=REPO)
     ap.add_argument("--out", type=Path, default=OUT / "judge_gpt41_grid")
-    ap.add_argument("--hedge", type=Path, required=True, help="hedge167_rows.csv (human labels)")
+    ap.add_argument(
+        "--hedge", type=Path, required=True, help="judge_vs_human_rows.csv (human labels)"
+    )
     ap.add_argument(
         "--published",
         type=Path,
-        default=OUT / "controlled_grid" / "f1_agentic_minus_loop.csv",
-        help="f1_agentic_minus_loop.csv to reproduce",
+        default=OUT / "controlled_grid" / "grid_f1_agentic_minus_loop.csv",
+        help="grid_f1_agentic_minus_loop.csv to reproduce",
     )
     args = ap.parse_args()
 
@@ -255,7 +257,7 @@ def main() -> int:
         if not r["descriptive"]:
             hn, hg = r["nano_p_holm_final"] < 0.05, r["gpt41_p_holm_final"] < 0.05
             r["holm_change"] = "" if hn == hg else ("sig->ns" if hn else "ns->sig")
-    write_csv(out / "contrasts_by_judge.csv", contrast_rows)
+    write_csv(out / "judge_grid_contrasts_by_judge.csv", contrast_rows)
 
     # reproduce the published nano Agentic-Loop Judge rows
     pub = {
@@ -302,7 +304,7 @@ def main() -> int:
                 "gpt41_hedge_run": h["judge_gpt41"],
             }
         )
-    write_csv(out / "r4_rows.csv", r4)
+    write_csv(out / "judge_vs_human_check_rows.csv", r4)
     tally = Counter()
     for r in r4:
         tally[(r["nano"], r["human"], str(r["gpt41_grid"]))] += 1

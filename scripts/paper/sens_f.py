@@ -23,7 +23,7 @@ Everything else is as in the main table:
 Also counts, per cell, the zero-filled (configuration, run, question) entries
 of Agentic and of Loop, i.e. on which side the refusals fall.
 
-Writes sens_f_table.csv and sens_f_table.tex (layout of tab:rq1_main) to
+Writes grid_sensitivity_declined_scored_wrong.csv and .tex (--mode asis: grid_sensitivity_declined_kept.csv and .tex) (layout of tab:rq1_main) to
 scripts/paper/out/robustness/. Reads the outputs of controlled_grid_analysis.py and
 judge_gpt41_grid.py (run them first). Reads only; no API call; no prediction
 is printed.
@@ -73,7 +73,11 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=OUT / "robustness")
     ap.add_argument("--mode", choices=("zero", "asis"), default="zero")
     args = ap.parse_args()
-    suffix = "" if args.mode == "zero" else "_asis"
+    stem = (
+        "grid_sensitivity_declined_scored_wrong"
+        if args.mode == "zero"
+        else "grid_sensitivity_declined_kept"
+    )
     code = args.code_repo.resolve()
     results = code / "data" / "results-campaign"
     sys.path.insert(0, str(code))
@@ -242,8 +246,8 @@ def main() -> int:
     # main-table values under gpt-4.1 for the comparison column
     main = {}
     for path, judge_col in (
-        (OUT / "controlled_grid" / "f1_agentic_minus_loop.csv", None),
-        (OUT / "judge_gpt41_grid" / "contrasts_by_judge.csv", "gpt41"),
+        (OUT / "controlled_grid" / "grid_f1_agentic_minus_loop.csv", None),
+        (OUT / "judge_gpt41_grid" / "judge_grid_contrasts_by_judge.csv", "gpt41"),
     ):
         with open(path) as fh:
             for r in csv.DictReader(fh):
@@ -280,7 +284,7 @@ def main() -> int:
             (r["p_holm_final_F"] < 0.05) != (float(ph) < 0.05)
         )
     args.out.mkdir(parents=True, exist_ok=True)
-    write_csv(args.out / f"sens_f_table{suffix}.csv", rows)
+    write_csv(args.out / f"{stem}.csv", rows)
 
     by = {(r["model"], r["metric"], r["dataset"], str(r["hop"])): r for r in rows}
     lines = [
@@ -330,7 +334,7 @@ def main() -> int:
                 f" & {mlabel} $\\Delta$ [95\\% CI]\n   & " + "\n   & ".join(parts) + " \\\\"
             )
     lines += ["\\bottomrule", "\\end{tabular}", ""]
-    (args.out / f"sens_f_table{suffix}.tex").write_text("\n".join(lines), encoding="utf-8")
+    (args.out / f"{stem}.tex").write_text("\n".join(lines), encoding="utf-8")
 
     print(
         f"mode {args.mode}; kept-in questions {sum(len(v) for v in refused.values())}; zero-filled entries "

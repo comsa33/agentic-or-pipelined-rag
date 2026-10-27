@@ -3,15 +3,15 @@
 
 Sensitivity A (controlled_grid_analysis.py) adds to each model's exclusions every
 question on which any call of any configuration and run was refused, so its
-cells are computed only on questions no refusal touched. The _A CSVs of controlled_grid_analysis.py carry the
+cells are computed only on questions no refusal touched. The _declined_removed CSVs of controlled_grid_analysis.py carry the
 gpt-4.1-nano judge. This runs controlled_grid_analysis.py unchanged with
 --judge gpt-4-1_39118f into a temporary directory (the same way mplus_gpt41.py
-does), takes f1_agentic_minus_loop_A.csv and f6_stability_A.csv, and checks
-that its F1 rows equal the _A F1 rows written by controlled_grid_analysis.py
+does), takes grid_f1_agentic_minus_loop_declined_removed.csv and grid_stability_declined_removed.csv, and checks
+that its F1 rows equal the _declined_removed F1 rows written by controlled_grid_analysis.py
 (F1 does not depend on the judge; run that script first).
 
-Writes sens_a_table.csv (one row per model, metric and cell) and
-sens_a_table.tex (a table fragment laid out like tab:rq1_main: n, levels, and
+Writes grid_sensitivity_declined_removed.csv (one row per model, metric and cell) and
+grid_sensitivity_declined_removed.tex (a table fragment laid out like tab:rq1_main: n, levels, and
 Delta [95% CI] with bold = tested cell whose CI excludes 0, * = Holm p < .05, s/u = run
 stability, dagger = descriptive) to scripts/paper/out/robustness/. Reads only;
 no API call.
@@ -88,16 +88,16 @@ def main() -> int:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        a_rows = read(tmp / "out/f1_agentic_minus_loop_A.csv")
+        a_rows = read(tmp / "out/grid_f1_agentic_minus_loop_declined_removed.csv")
         f6 = {
             (r["metric"], r["model"], r["dataset"], r["hop"]): r
-            for r in read(tmp / "out/f6_stability_A.csv")
+            for r in read(tmp / "out/grid_stability_declined_removed.csv")
         }
-        d_rows = read(tmp / "out/f1_agentic_minus_loop.csv")
+        d_rows = read(tmp / "out/grid_f1_agentic_minus_loop.csv")
 
     published_a = {
         (r["model"], r["dataset"], r["hop"]): r
-        for r in read(OUT / "controlled_grid" / "f1_agentic_minus_loop_A.csv")
+        for r in read(OUT / "controlled_grid" / "grid_f1_agentic_minus_loop_declined_removed.csv")
         if r["metric"] == "f1"
     }
     for r in a_rows:
@@ -140,7 +140,7 @@ def main() -> int:
             }
         )
     args.out.mkdir(parents=True, exist_ok=True)
-    with open(args.out / "sens_a_table.csv", "w", newline="") as fh:
+    with open(args.out / "grid_sensitivity_declined_removed.csv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(out_rows[0]))
         w.writeheader()
         w.writerows(out_rows)
@@ -191,7 +191,9 @@ def main() -> int:
                 f" & {mlabel} $\\Delta$ [95\\% CI]\n   & " + "\n   & ".join(parts) + " \\\\"
             )
     lines += ["\\bottomrule", "\\end{tabular}", ""]
-    (args.out / "sens_a_table.tex").write_text("\n".join(lines), encoding="utf-8")
+    (args.out / "grid_sensitivity_declined_removed.tex").write_text(
+        "\n".join(lines), encoding="utf-8"
+    )
     ch = [r for r in out_rows if r["sign_change"] or r["holm_change"]]
     print(
         f"rows {len(out_rows)}; cells whose verdict differs from the main table: "

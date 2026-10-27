@@ -13,8 +13,8 @@ the questions asked.
 Before writing, the single-reference recount of every variant is checked
 against its run summary, so the rows read are the rows the summary scored.
 
-Writes rq3_evaluation_ablation.csv, rq4_structure_ablation.csv and
-ablation_full.csv to scripts/paper/out/uncontrolled_instances/. Reading only.
+Writes instances_evaluation_tool.csv, instances_structure_tools.csv and
+instances_all_variants.csv to scripts/paper/out/uncontrolled_instances/. Reading only.
 The script needs data/results/paper and the 27 March reruns.
 
     uv run python scripts/paper/uncontrolled_instances.py
@@ -109,9 +109,9 @@ if len(runs(RERUNS, "ablation", "20260327")) != 4:
     sys.exit("the four 27 March 2026 manual-prompt reruns are not in data/results")
 
 tables = {
-    "rq3_evaluation_ablation.csv": table("rq3", "202603", PAPER, None),
-    "rq4_structure_ablation.csv": table("rq4", "202603", PAPER, None),
-    "ablation_full.csv": table("ablation", "20260325", PAPER, "paper_dir")
+    "instances_evaluation_tool.csv": table("rq3", "202603", PAPER, None),
+    "instances_structure_tools.csv": table("rq4", "202603", PAPER, None),
+    "instances_all_variants.csv": table("ablation", "20260325", PAPER, "paper_dir")
     + table("ablation", "20260327", RERUNS, "2026-03-27_rerun", lambda v: f"{v}_bugfixed"),
 }
 args.out_dir.mkdir(parents=True, exist_ok=True)

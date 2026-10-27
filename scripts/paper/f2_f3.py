@@ -5,13 +5,13 @@ Reads the 30 gpt-5-mini runs (controlled grid rq1 k1-3 x 4 datasets,
 budget_matched k1-3 x {2Wiki, FB}, external IRCoT k1-3 x 4 datasets) and
 writes to scripts/paper/out/budget/:
 
-1. f2_contrasts.csv: the budget-matched contrasts Agentic - Loop(budget=10),
+1. budget_matched_contrasts.csv: the budget-matched contrasts Agentic - Loop(budget=10),
    Agentic(budget=6) - Loop, Loop(budget=10) - Loop, plus the exploratory
    Agentic(budget=6) - Agentic, per (dataset, hop bin) on F1 and Judge;
-2. f3_contrasts.csv: Agentic - IRCoT and Loop - IRCoT per (dataset, hop bin);
-3. pipeline_levels.csv: per (dataset, hop bin) and pipeline the F1, Judge,
+2. external_ircot_contrasts.csv: Agentic - IRCoT and Loop - IRCoT per (dataset, hop bin);
+3. budget_pipeline_levels.csv: per (dataset, hop bin) and pipeline the F1, Judge,
    metered calls and cost per question on the paired questions;
-4. budget6_calls.csv: how many metered calls Agentic(budget=6) actually made;
+4. budget_six_call_cell.csv: how many metered calls Agentic(budget=6) actually made;
 5. ircot_fallback.csv: JSONAdapter re-sends per IRCoT run;
 6. verdicts.json: the decision rules read off the tables.
 
@@ -268,8 +268,8 @@ def main() -> int:
 
     f2 = contrasts("F2", F2, F2_DATASETS)
     f3 = contrasts("F3", F3, DATASETS)
-    write_csv(out / "f2_contrasts.csv", f2)
-    write_csv(out / "f3_contrasts.csv", f3)
+    write_csv(out / "budget_matched_contrasts.csv", f2)
+    write_csv(out / "external_ircot_contrasts.csv", f3)
 
     # ---- levels per pipeline on the questions every pipeline of the table shares
     levels = []
@@ -292,7 +292,7 @@ def main() -> int:
                             **{m: float(arr(m, ds, p, qids).mean()) for m in metrics},
                         }
                     )
-    write_csv(out / "pipeline_levels.csv", levels)
+    write_csv(out / "budget_pipeline_levels.csv", levels)
 
     # ---- how many calls Agentic(budget=6) made, against Loop(budget=10) and Agentic
     calls = []
@@ -316,7 +316,7 @@ def main() -> int:
                         "llm_calls_max": int(llm.max()),
                     }
                 )
-    write_csv(out / "budget6_calls.csv", calls)
+    write_csv(out / "budget_six_call_cell.csv", calls)
 
     # ---- IRCoT JSONAdapter re-sends (structured_calls), per run
     fallback = []

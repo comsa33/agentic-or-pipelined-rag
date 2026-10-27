@@ -22,7 +22,7 @@ It also ties the count to refusal_categories.py: rows with a refusal (288)
 minus rows with a final refusal (32) = rows with a refusal and no final one
 (256), and those 256 are exactly the recovered rows outside final_in_row.
 
-Writes recovered_rows.csv (per dataset x pipeline) and recovered_rows.json.
+Writes refusal_recovered_rows.csv (per dataset x pipeline) and refusal_recovered_rows.json.
 No API call.
 
 Writes to scripts/paper/out/refusal/.
@@ -116,7 +116,7 @@ def main() -> None:
                     kept_checks["answer_text_refusal_marker"] += bool(is_refusal(pred or ""))
                     c["kept_answer_text_refusal_marker"] += bool(is_refusal(pred or ""))
 
-    with open(out / "recovered_rows.csv", "w", newline="") as fh:
+    with open(out / "refusal_recovered_rows.csv", "w", newline="") as fh:
         fields = [
             "dataset",
             "pipeline",
@@ -142,7 +142,7 @@ def main() -> None:
             "kept_plus_excluded_question": tot["kept"] + tot["excluded_question"],
         },
     }
-    (out / "recovered_rows.json").write_text(json.dumps(summary, indent=2) + "\n")
+    (out / "refusal_recovered_rows.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps(summary, indent=2))
 
 

@@ -8,16 +8,16 @@ same comparison_rng keys) and the Holm families (judge metric, non-descriptive
 hop cells) are the script's own. It then
 
 1. checks that the script's main-suite judge rows under gpt-4.1 equal the
-   gpt41_* columns of contrasts_by_judge.csv (Agentic - Loop), the source of
+   gpt41_* columns of judge_grid_contrasts_by_judge.csv (Agentic - Loop), the source of
    the Judge rows of tab:rq1_main;
-2. writes mplus_gpt41.csv: per cell the M+ contrast under gpt-4.1 next to the
+2. writes judge_grid_common_questions.csv: per cell the M+ contrast under gpt-4.1 next to the
    main-set contrast under gpt-4.1, and whether the sign verdict (95% CI) or
    the Holm verdict changes.
 
 Uses only the existing judged_gpt-4-1_39118f files; no API call; no
 prediction is printed.
 
-Run judge_gpt41_grid.py first (it writes contrasts_by_judge.csv).
+Run judge_gpt41_grid.py first (it writes judge_grid_contrasts_by_judge.csv).
 
     uv run python scripts/paper/mplus_gpt41.py
 """
@@ -70,16 +70,18 @@ def main() -> int:
             stdout=subprocess.DEVNULL,
         )
         main_rows = [
-            r for r in read(tmp / "out/f1_agentic_minus_loop.csv") if r["metric"] == "judge"
+            r for r in read(tmp / "out/grid_f1_agentic_minus_loop.csv") if r["metric"] == "judge"
         ]
         mplus_rows = [
-            r for r in read(tmp / "out/f1_agentic_minus_loop_mplus.csv") if r["metric"] == "judge"
+            r
+            for r in read(tmp / "out/grid_f1_agentic_minus_loop_common_questions.csv")
+            if r["metric"] == "judge"
         ]
 
-    # 1. main suite under gpt-4.1 == contrasts_by_judge.csv gpt41 columns (Agentic - Loop)
+    # 1. main suite under gpt-4.1 == judge_grid_contrasts_by_judge.csv gpt41 columns (Agentic - Loop)
     ref = {
         tuple(r[k] for k in KEY): r
-        for r in read(args.out / "contrasts_by_judge.csv")
+        for r in read(args.out / "judge_grid_contrasts_by_judge.csv")
         if r["contrast"] == "Agentic-Loop"
     }
     for r in main_rows:
@@ -138,7 +140,9 @@ def main() -> int:
                 "holm_family_size": r["holm_family_size"],
             }
         )
-    with open(args.out / "mplus_gpt41.csv", "w", newline="", encoding="utf-8") as fh:
+    with open(
+        args.out / "judge_grid_common_questions.csv", "w", newline="", encoding="utf-8"
+    ) as fh:
         w = csv.DictWriter(fh, fieldnames=list(out_rows[0]))
         w.writeheader()
         w.writerows(out_rows)

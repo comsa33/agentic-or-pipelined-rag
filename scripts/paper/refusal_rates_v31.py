@@ -3,7 +3,7 @@
 
 Reads the March (Gemini, gpt-5-mini) and July (gpt-oss-120b) runs of the
 uncontrolled grid, data/results/paper and data/results-openweight/final, with
-the frozen 31-pattern set and writes scripts/paper/out/refusal_rates_v31.csv.
+the frozen 31-pattern set and writes scripts/paper/out/uncontrolled_refusal_markers.csv.
 Reading only. The script needs both trees.
 
 --legacy names an earlier 21-pattern refusal_rates.csv. When it is given, the
@@ -23,7 +23,9 @@ ap = argparse.ArgumentParser()
 REPO = Path(__file__).resolve().parents[2]
 ap.add_argument("--code-repo", type=Path, default=REPO)
 ap.add_argument(
-    "--out", type=Path, default=REPO / "scripts" / "paper" / "out" / "refusal_rates_v31.csv"
+    "--out",
+    type=Path,
+    default=REPO / "scripts" / "paper" / "out" / "uncontrolled_refusal_markers.csv",
 )
 ap.add_argument(
     "--legacy", type=Path, default=None, help="earlier 21-pattern refusal_rates.csv to compare with"

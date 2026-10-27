@@ -12,8 +12,8 @@
    judge (gpt-4-1_39118f). Holm within metric over the non-descriptive cells
    (MuSiQue 4-hop and the FinanceBench judge are descriptive);
    p_holm in [0.04, 0.06] is redrawn with 10x the draws.
-   Each family's own M+ Delta is checked against f1_agentic_minus_loop_mplus.csv
-   (F1) and mplus_gpt41.csv (judge).
+   Each family's own M+ Delta is checked against grid_f1_agentic_minus_loop_common_questions.csv
+   (F1) and judge_grid_common_questions.csv (judge).
 2. Minimum detectable effect and equivalence for gpt-5-mini, on the main
    question set of the main table (the family's own exclusions only) and with the
    bootstrap draws of that table itself (same comparison key, so the 95%
@@ -22,7 +22,7 @@
    bootstrap interval lies inside (-margin, +margin); p_TOST is the larger of
    the two one-sided bootstrap shares beyond the margins.
 
-Writes interaction.csv and equivalence_gpt5mini.csv to
+Writes grid_interaction.csv and grid_mde_gpt5mini.csv to
 scripts/paper/out/robustness/. Reads the outputs of controlled_grid_analysis.py
 and mplus_gpt41.py (run them first). Reads only.
 
@@ -177,14 +177,14 @@ def main() -> int:
 
     # check each family's M+ Delta against the published M+ tables
     mplus = {}
-    with open(OUT / "controlled_grid" / "f1_agentic_minus_loop_mplus.csv") as fh:
+    with open(OUT / "controlled_grid" / "grid_f1_agentic_minus_loop_common_questions.csv") as fh:
         for r in csv.DictReader(fh):
             if r["metric"] == "f1":
                 mplus[("f1", r["model"], r["dataset"], int(r["hop"]))] = (
                     float(r["delta"]),
                     int(r["n"]),
                 )
-    with open(OUT / "judge_gpt41_grid" / "mplus_gpt41.csv") as fh:
+    with open(OUT / "judge_gpt41_grid" / "judge_grid_common_questions.csv") as fh:
         for r in csv.DictReader(fh):
             mplus[("judge", r["model"], r["dataset"], int(r["hop"]))] = (
                 float(r["mplus_judge_delta"]),
@@ -199,11 +199,11 @@ def main() -> int:
                     f"M+ mismatch {r['metric']} {model} {r['dataset']} {r['hop']}: {r[col]} vs {d}"
                 )
             checked += 1
-    write_csv(out / "interaction.csv", rows)
+    write_csv(out / "grid_interaction.csv", rows)
 
     # ---- 2. MDE and TOST for gpt-5-mini, main set ------------------------
     published = {}
-    with open(OUT / "controlled_grid" / "f1_agentic_minus_loop.csv") as fh:
+    with open(OUT / "controlled_grid" / "grid_f1_agentic_minus_loop.csv") as fh:
         for r in csv.DictReader(fh):
             if r["model"] == GPT and r["metric"] == "f1":
                 published[(r["dataset"], int(r["hop"]))] = (float(r["ci_lo"]), float(r["ci_hi"]))
@@ -241,7 +241,7 @@ def main() -> int:
                     row[f"tost_p_{m:.2f}"] = p_tost
                     row[f"equivalent_{m:.2f}"] = row["ci90_lo"] > -m and row["ci90_hi"] < m
                 eq_rows.append(row)
-    write_csv(out / "equivalence_gpt5mini.csv", eq_rows)
+    write_csv(out / "grid_mde_gpt5mini.csv", eq_rows)
     print(
         json.dumps(
             {
