@@ -1,0 +1,731 @@
+"""Run manifest: the conditions a result directory was produced under.
+
+The March 2026 paper runs recorded `top_k`, `seed` and the threshold, and
+nothing else. When one cell had to be re-run months later there was no way to
+show it had been run under the same model snapshot, package versions, request
+parameters or code, so every partial re-run was thrown away and the campaign
+re-done from scratch. `RunManifest` writes everything needed for that proof
+into `manifest.json` next to the results, and `preflight` refuses to start a
+run whose provider answers with a snapshot other than the declared one.
+
+What is recorded, and why each item is there:
+
+  models[*].spec / resolved       the model string as configured, and as sent
+  models[*].observed_response_model
+                                  `response.model` of a real reply, i.e. the
+                                  snapshot that actually answered (the Azure
+                                  and native OpenAI deployments of gpt-5-mini
+                                  both report `gpt-5-mini-2025-08-07`)
+  models[*].sent_params           the request parameters litellm forwards
+                                  after `drop_params`, reconstructed with
+                                  `get_optional_params`. This is the record of
+                                  whether `temperature=0` was honoured
+                                  (gpt-5-mini silently drops it) and whether
+                                  `reasoning_effort` reached the provider
+  packages / git                  prompt formats change with dspy, parameter
+                                  handling with litellm, everything with code
+  cache                           latency is meaningless from a warm cache
+  settings_by_variant             the settings each variant runs under (agent
+                                  iterations and tools, retrieval, passage cap,
+                                  budget, ...), taken with that variant's
+                                  configuration applied; verify holds each
+                                  variant's summary.json to it
+  process_defaults                the settings before any variant is applied
+                                  (settings.py defaults and .env). Not what
+                                  ran: version 1 manifests stored these under
+                                  model_defaults / retrieval / evaluation /
+                                  agent, and agent.max_iterations there read
+                                  5 where every agentic variant ran 10
+"""
+
+from __future__ import annotations
+
+import inspect
+import json
+import os
+import platform
+import subprocess
+import sys
+import time
+from importlib import metadata
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+from loguru import logger
+from pydantic import BaseModel, Field
+
+from agentic_rag.config.settings import ANTHROPIC_PREFIX, PROJECT_ROOT, make_lm, settings
+
+if TYPE_CHECKING:
+    # The meter imports litellm; verify reads manifests without it.
+    from agentic_rag.evaluation.cost_tracker import LiteLLMMeter
+
+MANIFEST_FILENAME = "manifest.json"
+MANIFEST_VERSION = 2
+
+MODEL_SLOTS = ("preprocess", "evaluate", "generate", "agent")
+
+# Fields every successful result row must carry for the paper's tables.
+# `verify_campaign.py` refuses a run that is missing any of them; extend this
+# list when a table needs a value that is not yet stored.
+REQUIRED_ROW_FIELDS = (
+    "id",
+    "question",
+    "reference",
+    # every accepted answer: refusal/hop analyses take the best F1 over these
+    # and would silently fall back to `reference` alone if missing
+    "all_references",
+    "prediction",
+    "pipeline",
+    "retry_count",
+    "action_history",
+    "evaluation_scores",
+    "passages_used",
+    "total_passages_retrieved",
+    "llm_calls",
+    "latency_seconds",
+    "question_difficulty",
+    "tool_score_trace",
+    # measured usage (LiteLLMMeter)
+    "metered_calls",
+    "prompt_tokens",
+    "cached_tokens",
+    "completion_tokens",
+    "reasoning_tokens",
+    "cost_usd",
+    "response_models",
+    "usage_complete",
+    # provenance (row_provenance): which run, commit and cache setting made it
+    "run_id",
+    "repeat_index",
+    "git_commit",
+    "llm_cache_disabled",
+)
+
+# Request parameters that carry credentials or routing and are not part of the
+# model's behaviour. They are neither reconstructed nor written to disk.
+_PRIVATE_LM_KWARGS = ("api_key", "api_base", "num_retries")
+
+# Provider-specific request fields that litellm forwards to the provider
+# unchanged but that are not among its standard optional parameters, so
+# `get_optional_params` would leave them out of the record. Anthropic effort
+# travels this way (see make_lm).
+_PASSTHROUGH_LM_KWARGS = ("output_config", "thinking")
+
+_TRACKED_PACKAGES = ("dspy", "litellm", "openai", "pydantic", "sentence-transformers")
+
+
+class ManifestMismatchError(RuntimeError):
+    """The provider answered with a snapshot other than the declared one."""
+
+
+class ModelSlotRecord(BaseModel):
+    """One of the four model slots, as configured and as observed."""
+
+    slot: str
+    spec: str
+    resolved: str
+    provider: str | None = None
+    api_version: str | None = None
+    reasoning_model: bool = False
+    dspy_kwargs: dict = Field(default_factory=dict)
+    sent_params: dict = Field(default_factory=dict)
+    expected_response_model: str | None = None
+    observed_response_model: str | None = None
+    # Anthropic only: `created_at` of the model as the Models API lists it,
+    # read at preflight and again when the run finishes. Claude 5.x model ids
+    # carry no snapshot date and the response echoes the id unchanged, so
+    # the pin above cannot detect a model update; these dates are the only
+    # (weak) record of one, within a run and between repeats.
+    provider_model_created_at: str | None = None
+    provider_model_created_at_end: str | None = None
+    # USD per token as litellm prices this model when the run starts (cost
+    # keys of its price entry; empty if litellm has none).
+    unit_prices: dict = Field(default_factory=dict)
+    # Anthropic only: which ANTHROPIC_API_KEY_<n> the run spent. The key is
+    # never recorded, nor any hash of it.
+    anthropic_key_slot: int | None = None
+    # Fields of the request body the preflight call actually sent, read from
+    # litellm's final request (see cost_tracker._request_summary).
+    observed_request: dict | None = None
+
+
+class RunManifest(BaseModel):
+    manifest_version: int = MANIFEST_VERSION
+    run_id: str
+    # What this run is a run *of*: config stem, dataset, model tag, n and
+    # repeat index. Two finished runs with the same key are duplicates, and
+    # the runner refuses to start a third unless forced.
+    run_key: str = ""
+    repeat_index: int | None = None
+    # 1 for a fresh run; incremented by each explicit --resume of the same
+    # run_id, whose earlier manifest is kept as manifest.attempt<N>.json.
+    attempt: int = 1
+    created_at: str
+    finished_at: str | None = None
+    command: list[str]
+    config_path: str | None = None
+    experiment: str
+    dataset: str
+    n: int
+    sample_size: int | None = None
+    # Smoke runs only: the questions named by --question-ids instead of a
+    # seeded sample (file, its sha256, the ids in run order and their hash).
+    question_set: dict | None = None
+    variants: list[str]
+    seed: int
+    # smoke | pilot | grid, fixed before the run (settings.experiment).
+    campaign_phase: str | None = None
+    git: dict
+    packages: dict
+    cache: dict
+    # Settings before any variant's configuration is applied (settings.py
+    # defaults and .env), kept to show what the configs changed. They are
+    # not the settings any variant ran under: those are settings_by_variant.
+    process_defaults: dict = Field(default_factory=dict)
+    # Variant name -> the settings it runs under (experiments.run
+    # _settings_used, the same dict its summary.json carries), taken before
+    # the first question with that variant's configuration applied.
+    settings_by_variant: dict[str, dict] = Field(default_factory=dict)
+    # Version 1 manifests only: the same values as process_defaults, under
+    # names that read as the run's settings. Kept so old manifests load.
+    model_defaults: dict | None = None
+    retrieval: dict | None = None
+    evaluation: dict | None = None
+    agent: dict | None = None
+    # Variant name -> passages the generator may see (None = all retrieved).
+    # Taken from each pipeline class under that variant's settings, so the
+    # "controlled for M" scope of a table is read from here, not assumed.
+    max_passages_by_pipeline: dict[str, int | None] = Field(default_factory=dict)
+    # Variant name -> LLM-call budget (None = the pipeline's own stopping
+    # rule) and -> pipeline kind (naive/crag/loop/agentic). The verifier
+    # holds loop variants to their budget exactly and agentic ones loosely,
+    # because only the loop can spend a budget deterministically.
+    llm_call_budget_by_pipeline: dict[str, int | None] = Field(default_factory=dict)
+    pipeline_by_variant: dict[str, str] = Field(default_factory=dict)
+    # IRCoT variants: our parameters next to the paper's (max_steps,
+    # per_step_k, max_paragraphs, retriever, reader).
+    ircot_params_by_pipeline: dict[str, dict] = Field(default_factory=dict)
+    models: list[ModelSlotRecord]
+    preflight: dict = Field(default_factory=lambda: {"status": "pending"})
+    observed_response_models: list[str] = Field(default_factory=list)
+    usage_total: dict | None = None
+    # Rows reused from a checkpoint written by an earlier process. Those rows
+    # were made under that process's conditions, not this manifest's, and
+    # carry their own run_id / git_commit stamps for the verifier to compare.
+    resumed: dict | None = None
+
+    # -- persistence ---------------------------------------------------
+    def save(self, run_dir: Path) -> Path:
+        run_dir = Path(run_dir)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        path = run_dir / MANIFEST_FILENAME
+        path.write_text(self.model_dump_json(indent=2), encoding="utf-8")
+        return path
+
+    @classmethod
+    def load(cls, run_dir: Path) -> RunManifest:
+        path = Path(run_dir) / MANIFEST_FILENAME
+        return cls.model_validate_json(path.read_text(encoding="utf-8"))
+
+    # -- checks -------------------------------------------------------
+    def run_preflight(self, run_dir: Path, meter: LiteLLMMeter | None = None) -> None:
+        """Ask each distinct model for one reply and compare the snapshot.
+
+        The manifest is written before the check so that a mismatch leaves
+        evidence on disk. Raises `ManifestMismatchError` on the first slot
+        whose reply names a snapshot other than the declared one.
+        """
+        from agentic_rag.evaluation.cost_tracker import LiteLLMMeter
+
+        meter = meter or LiteLLMMeter().install()
+        observed: dict[str, str | None] = {}
+        created: dict[str, str | None] = {}
+        requests: dict[str, dict | None] = {}
+        for rec in self.models:
+            if rec.spec not in observed:
+                metered = isinstance(meter, LiteLLMMeter)
+                mark = meter.mark() if metered else 0
+                observed[rec.spec] = _observe_response_model(rec.spec, self.run_id, meter)
+                answered = [c for c in meter.calls[mark:] if not c.failed_status] if metered else []
+                requests[rec.spec] = answered[-1].request if answered else None
+                if rec.spec.startswith(ANTHROPIC_PREFIX):
+                    created[rec.spec] = _anthropic_model_created_at(rec.spec)
+            rec.observed_response_model = observed[rec.spec]
+            rec.provider_model_created_at = created.get(rec.spec)
+            rec.observed_request = requests[rec.spec]
+
+        mismatches = [
+            f"{rec.slot}: declared {rec.expected_response_model!r}, "
+            f"got {rec.observed_response_model!r}"
+            for rec in self.models
+            if rec.expected_response_model
+            and rec.observed_response_model != rec.expected_response_model
+        ]
+        unpinned = sorted({rec.spec for rec in self.models if not rec.expected_response_model})
+        self.preflight = {
+            "status": "mismatch" if mismatches else "ok",
+            "checked_at": _now(),
+            "mismatches": mismatches,
+            "unpinned": unpinned,
+        }
+        self.save(run_dir)
+
+        if mismatches:
+            raise ManifestMismatchError(
+                "Refusing to start: model snapshot differs from LLM_EXPECTED_RESPONSE_MODELS -- "
+                + "; ".join(mismatches)
+            )
+        if unpinned:
+            logger.warning(
+                f"Model snapshot unpinned for {unpinned}: the run records what it observes "
+                f"but cannot abort on a change. Set LLM_EXPECTED_RESPONSE_MODELS to pin it."
+            )
+        logger.info(f"Preflight OK: {[(r.slot, r.observed_response_model) for r in self.models]}")
+
+    def finish_run(
+        self,
+        run_dir: Path,
+        meter: LiteLLMMeter | None,
+        results: dict[str, list[dict]] | None = None,
+    ) -> None:
+        """Record what the whole run observed, then rewrite the manifest."""
+        self.finished_at = _now()
+        created: dict[str, str | None] = {}
+        for rec in self.models:
+            if rec.spec.startswith(ANTHROPIC_PREFIX):
+                if rec.spec not in created:
+                    created[rec.spec] = _anthropic_model_created_at(rec.spec)
+                rec.provider_model_created_at_end = created[rec.spec]
+        if meter is not None:
+            meter.drain()
+            self.observed_response_models = sorted(meter.observed_models)
+            self.usage_total = {**meter.usage_total(), "leaked_calls": meter.leaked_calls}
+        if results is not None:
+            self.resumed = resumed_rows(self.run_id, results)
+        self.save(run_dir)
+
+
+# ---------------------------------------------------------------------------
+# Building
+# ---------------------------------------------------------------------------
+def build_manifest(
+    *,
+    run_id: str,
+    experiment: str,
+    dataset: str,
+    n: int,
+    variants: list[str],
+    config_path: str | None = None,
+    sample_size: int | None = None,
+    question_set: dict | None = None,
+    run_key: str = "",
+    repeat_index: int | None = None,
+    attempt: int = 1,
+    max_passages_by_pipeline: dict[str, int | None] | None = None,
+    llm_call_budget_by_pipeline: dict[str, int | None] | None = None,
+    pipeline_by_variant: dict[str, str] | None = None,
+    ircot_params_by_pipeline: dict[str, dict] | None = None,
+    settings_by_variant: dict[str, dict] | None = None,
+) -> RunManifest:
+    """Snapshot the process-wide settings and environment for one run."""
+    models = [model_slot_record(slot) for slot in MODEL_SLOTS]
+    # A run of an Anthropic model must state its campaign phase up front:
+    # verify treats refused and truncated error rows differently by phase,
+    # so the phase cannot be left to be chosen after the results are seen.
+    if settings.experiment.campaign_phase is None and any(
+        r.spec.startswith(ANTHROPIC_PREFIX) for r in models
+    ):
+        raise ValueError(
+            "Anthropic model run without a campaign phase: pass --campaign-phase "
+            "smoke|pilot|grid (or set CAMPAIGN_PHASE)"
+        )
+    return RunManifest(
+        max_passages_by_pipeline=max_passages_by_pipeline or {},
+        llm_call_budget_by_pipeline=llm_call_budget_by_pipeline or {},
+        pipeline_by_variant=pipeline_by_variant or {},
+        ircot_params_by_pipeline=ircot_params_by_pipeline or {},
+        settings_by_variant=settings_by_variant or {},
+        run_id=run_id,
+        run_key=run_key,
+        repeat_index=repeat_index,
+        attempt=attempt,
+        created_at=_now(),
+        command=list(sys.argv),
+        config_path=config_path,
+        experiment=experiment,
+        dataset=dataset,
+        n=n,
+        sample_size=sample_size,
+        question_set=question_set,
+        variants=list(variants),
+        seed=settings.experiment.seed,
+        campaign_phase=settings.experiment.campaign_phase,
+        git=git_state(),
+        packages=package_versions(),
+        cache={
+            "llm_cache_disabled": settings.disable_llm_cache,
+        },
+        process_defaults=_process_defaults(),
+        models=models,
+    )
+
+
+def _process_defaults() -> dict:
+    """The global settings as they stand before any variant is applied."""
+    return {
+        "model": {
+            "temperature": settings.model.temperature,
+            "max_tokens": settings.model.max_tokens,
+            "reasoning_effort": settings.model.reasoning_effort,
+            "num_retries": settings.model.num_retries,
+            "embedding_model": settings.model.embedding_model,
+        },
+        "retrieval": {
+            "top_k": settings.retrieval.top_k,
+            "text_top_k": settings.retrieval.text_top_k,
+            "query_method": settings.retrieval.query_method,
+            "hybrid_weight": settings.retrieval.hybrid_weight,
+            "max_passages": settings.retrieval.max_passages,
+            "max_passages_all_pipelines": settings.retrieval.max_passages_all_pipelines,
+        },
+        "evaluation": {
+            "quality_threshold": settings.evaluation.quality_threshold,
+            "max_retry": settings.evaluation.max_retry_count,
+        },
+        "agent": {
+            "enabled_tools": settings.agent.enabled_tools,
+            "max_iterations": settings.agent.max_iterations,
+        },
+    }
+
+
+def model_slot_record(slot: str) -> ModelSlotRecord:
+    """Describe one model slot, including the parameters litellm would send."""
+    spec = getattr(settings.model, f"{slot}_model")
+    lm = make_lm(spec)
+    dspy_kwargs = {k: v for k, v in lm.kwargs.items() if k not in _PRIVATE_LM_KWARGS}
+    provider = _provider_of(lm.model)
+    return ModelSlotRecord(
+        slot=slot,
+        spec=spec,
+        resolved=lm.model,
+        provider=provider,
+        api_version=os.environ.get("AZURE_API_VERSION") if provider == "azure" else None,
+        reasoning_model=settings.model.is_reasoning_model(spec),
+        dspy_kwargs=dspy_kwargs,
+        sent_params=sent_params(lm.model, dspy_kwargs),
+        expected_response_model=settings.model.expected_response_model(spec),
+        unit_prices=_unit_prices(lm.model),
+        anthropic_key_slot=(
+            settings.model.anthropic_key_slot if spec.startswith(ANTHROPIC_PREFIX) else None
+        ),
+    )
+
+
+def _unit_prices(model: str) -> dict:
+    import litellm
+
+    name = model.split("/", 1)[-1]
+    entry = litellm.model_cost.get(model) or litellm.model_cost.get(name) or {}
+    return {k: v for k, v in entry.items() if k.endswith("_cost") or "cost_per_token" in k}
+
+
+def sent_params(model: str, lm_kwargs: dict) -> dict:
+    """Reconstruct what litellm forwards to the provider for `model`.
+
+    Uses litellm's own `get_optional_params` with `drop_params=True`, the
+    setting `make_lm` runs under, so a parameter the provider does not accept
+    disappears here exactly as it does on the wire.
+    """
+    import litellm
+    from litellm.utils import get_optional_params
+
+    name, provider, _, _ = litellm.get_llm_provider(model)
+    accepted = set(inspect.signature(get_optional_params).parameters)
+    kwargs = {k: v for k, v in lm_kwargs.items() if k in accepted and k not in _PRIVATE_LM_KWARGS}
+    params = get_optional_params(
+        model=name, custom_llm_provider=provider, drop_params=True, **kwargs
+    )
+    for key in _PASSTHROUGH_LM_KWARGS:
+        if key in lm_kwargs and key not in params:
+            params[key] = lm_kwargs[key]
+    return {k: v for k, v in params.items() if v not in (None, {}, [])}
+
+
+def git_state(root: Path = PROJECT_ROOT) -> dict:
+    def _git(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=root, capture_output=True, text=True, check=False
+        ).stdout.rstrip("\n")
+
+    # Porcelain lines are "XY path"; the status letters may be a space, so
+    # the leading whitespace of the first line must survive parsing.
+    status = _git("status", "--porcelain", "--untracked-files=no")
+    modified = [line[2:].strip() for line in status.splitlines() if line.strip()]
+    return {
+        "commit": _git("rev-parse", "HEAD") or None,
+        "branch": _git("rev-parse", "--abbrev-ref", "HEAD") or None,
+        "dirty": bool(modified),
+        "modified_files": modified,
+    }
+
+
+def package_versions() -> dict:
+    out = {"python": platform.python_version()}
+    for name in _TRACKED_PACKAGES:
+        try:
+            out[name] = metadata.version(name)
+        except metadata.PackageNotFoundError:
+            out[name] = None
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Run identity: where a run writes, and whether it may start at all
+# ---------------------------------------------------------------------------
+class DuplicateRunError(RuntimeError):
+    """A finished run with the same key already exists."""
+
+
+class RunPlan(BaseModel):
+    """Where one run writes and what it is a run of."""
+
+    run_id: str
+    run_key: str
+    run_dir: Path
+    checkpoint_dir: Path
+    repeat_index: int | None = None
+    attempt: int = 1
+    resumed: bool = False
+
+
+def make_run_key(
+    stem: str,
+    dataset: str,
+    model_tag: str,
+    n: int,
+    repeat_index: int | None,
+    question_set_hash: str | None = None,
+) -> str:
+    k = "" if repeat_index is None else str(repeat_index)
+    # A run of named questions is keyed apart from seeded samples of the same
+    # size; the hash sits in the dataset part, so verify's repeat sets
+    # (stem|dataset|model) never mix the two either.
+    if question_set_hash:
+        dataset = f"{dataset}@q{question_set_hash}"
+    return f"{stem}|{dataset}|{model_tag}|n{n}|k{k}"
+
+
+def load_question_set(path: Path | str, dataset: str) -> dict:
+    """The ids named for `dataset` in a {"<dataset>": [id, ...]} file."""
+    import hashlib
+
+    path = Path(path).resolve()
+    raw = path.read_bytes()
+    data = json.loads(raw)
+    ids = data.get(dataset) if isinstance(data, dict) else None
+    if not isinstance(ids, list) or not ids:
+        raise ValueError(f"{path} names no questions for {dataset!r}")
+    ids = [str(i) for i in ids]
+    if len(set(ids)) != len(ids):
+        raise ValueError(f"{path} names a question twice for {dataset!r}")
+    ids_hash = hashlib.sha256(json.dumps(ids).encode("utf-8")).hexdigest()
+    return {
+        "file": str(path),
+        "file_sha256": hashlib.sha256(raw).hexdigest(),
+        "ids": ids,
+        "ids_sha256": ids_hash,
+        "key": ids_hash[:8],
+    }
+
+
+def select_questions(dataset: list[dict], ids: list[str]) -> list[dict]:
+    """The items with these ids, in this order; refuses an id not in `dataset`."""
+    by_id = {str(item.get("id")): item for item in dataset}
+    missing = [i for i in ids if i not in by_id]
+    if missing:
+        raise ValueError(f"question id(s) not in the dataset: {missing}")
+    return [by_id[i] for i in ids]
+
+
+def find_finished_runs(results_dir: Path, run_key: str) -> list[Path]:
+    """Result directories under `results_dir` whose manifest finished with `run_key`."""
+    found: list[Path] = []
+    for path in sorted(Path(results_dir).glob(f"*/{MANIFEST_FILENAME}")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if data.get("run_key") == run_key and data.get("finished_at"):
+            found.append(path.parent)
+    return found
+
+
+def plan_run(
+    results_dir: Path,
+    *,
+    stem: str,
+    dataset: str,
+    model_tag: str,
+    n: int,
+    repeat_index: int | None = None,
+    resume: str | None = None,
+    force: bool = False,
+    question_set_hash: str | None = None,
+) -> RunPlan:
+    """Decide the run id, result directory and checkpoint directory of a run.
+
+    Checkpoints live under the run id, so a new run never silently picks up
+    another run's rows. Continuing an interrupted run is explicit: `resume`
+    names the run id, its earlier manifest is archived as
+    manifest.attempt<N>.json, and the run proceeds under the same id.
+
+    A fresh run whose key (config, dataset, model, n, repeat index) already
+    has a finished directory is refused, so a repeat is never overwritten or
+    paid for twice by accident; `force` overrides that.
+    """
+    results_dir = Path(results_dir)
+    run_key = make_run_key(stem, dataset, model_tag, n, repeat_index, question_set_hash)
+
+    if resume:
+        run_dir = results_dir / resume
+        manifest_path = run_dir / MANIFEST_FILENAME
+        if not manifest_path.exists():
+            raise FileNotFoundError(
+                f"Cannot resume {resume!r}: no {MANIFEST_FILENAME} under {run_dir}"
+            )
+        previous = RunManifest.load(run_dir)
+        if previous.finished_at and not force:
+            raise DuplicateRunError(
+                f"Run {resume!r} already finished at {previous.finished_at}; "
+                f"pass --force to run it again"
+            )
+        if previous.run_key and previous.run_key != run_key:
+            raise ValueError(
+                f"Cannot resume {resume!r}: it is a run of {previous.run_key!r}, "
+                f"but this command describes {run_key!r}"
+            )
+        phase = settings.experiment.campaign_phase
+        if previous.campaign_phase != phase:
+            raise ValueError(
+                f"Cannot resume {resume!r}: it was started as campaign phase "
+                f"{previous.campaign_phase!r}, but this command gives {phase!r}"
+            )
+        attempt = previous.attempt + 1
+        manifest_path.rename(run_dir / f"manifest.attempt{previous.attempt}.json")
+        logger.info(f"Resuming run {resume} (attempt {attempt})")
+        return RunPlan(
+            run_id=resume,
+            run_key=run_key,
+            run_dir=run_dir,
+            checkpoint_dir=results_dir / "checkpoints" / resume,
+            repeat_index=previous.repeat_index,
+            attempt=attempt,
+            resumed=True,
+        )
+
+    duplicates = find_finished_runs(results_dir, run_key)
+    if duplicates and not force:
+        raise DuplicateRunError(
+            f"A finished run of {run_key!r} already exists: "
+            f"{[d.name for d in duplicates]}. Use --repeat-index for another repetition, "
+            f"--resume <run_id> to continue one, or --force to run it again anyway."
+        )
+
+    suffix = "" if repeat_index is None else f"_k{repeat_index}"
+    if question_set_hash:
+        suffix = f"_q{question_set_hash}{suffix}"
+    run_id = f"{time.strftime('%Y%m%d_%H%M%S')}_{stem}_{dataset}_n{n}_{model_tag}{suffix}"
+    return RunPlan(
+        run_id=run_id,
+        run_key=run_key,
+        run_dir=results_dir / run_id,
+        checkpoint_dir=results_dir / "checkpoints" / run_id,
+        repeat_index=repeat_index,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def _now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+
+def _provider_of(model: str) -> str | None:
+    import litellm
+
+    try:
+        return litellm.get_llm_provider(model)[1]
+    except Exception:  # unknown model string: recorded as-is, provider unknown
+        return None
+
+
+def _anthropic_model_created_at(spec: str) -> str | None:
+    """`created_at` of an Anthropic model from the (free) Models API.
+
+    Never raises: a run is not refused for a missing provenance date, the
+    date is then recorded as None.
+    """
+    import httpx
+
+    name = spec[len(ANTHROPIC_PREFIX) :]
+    try:
+        resp = httpx.get(
+            f"https://api.anthropic.com/v1/models/{name}",
+            headers={
+                "x-api-key": os.environ.get("ANTHROPIC_API_KEY", ""),
+                "anthropic-version": "2023-06-01",
+            },
+            timeout=15.0,
+        )
+        resp.raise_for_status()
+        return resp.json().get("created_at")
+    except Exception as e:  # provenance only; the run proceeds
+        logger.warning(f"Preflight for {spec}: model created_at unavailable ({type(e).__name__})")
+        return None
+
+
+def _observe_response_model(spec: str, run_id: str, meter: LiteLLMMeter) -> str | None:
+    """Make one real call with `spec` and return the snapshot it answered with.
+
+    The prompt carries the run id so it can never be served from a cache,
+    which would report no response at all.
+    """
+    lm = make_lm(spec)
+    mark = meter.mark()
+    lm(f"Reply with the single word OK. (run {run_id})")
+    meter.drain()
+    calls = meter.calls[mark:]
+    if not calls:
+        logger.warning(f"Preflight for {spec}: no response was metered")
+        return None
+    return calls[-1].response_model or None
+
+
+def resumed_rows(run_id: str, results: dict[str, list[dict]]) -> dict:
+    """Count, per variant, the rows that were not produced by `run_id`."""
+    by_variant: dict[str, dict] = {}
+    all_sources: set[str] = set()
+    total = 0
+    for variant, rows in results.items():
+        foreign = [r for r in rows if r.get("run_id") != run_id]
+        if not foreign:
+            continue
+        sources = sorted({str(r.get("run_id")) for r in foreign})
+        by_variant[variant] = {"rows_reused": len(foreign), "source_run_ids": sources}
+        all_sources.update(sources)
+        total += len(foreign)
+    return {"rows_reused": total, "source_run_ids": sorted(all_sources), "by_variant": by_variant}
+
+
+def load_manifest_or_none(run_dir: Path) -> RunManifest | None:
+    path = Path(run_dir) / MANIFEST_FILENAME
+    if not path.exists():
+        return None
+    try:
+        return RunManifest.load(run_dir)
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.error(f"Unreadable manifest at {path}: {e}")
+        return None

@@ -1,0 +1,58 @@
+# Structure-tool variants of the agentic instance (uncontrolled grid,
+# reported descriptively): Full tools / w/o section_index / w/o term_index /
+# w/o both. The file stem names the result files of those runs.
+#
+# NOTE: Run with --dataset financebench only.
+# Multi-hop QA datasets (HotpotQA, 2Wiki, MuSiQue) have flat structure
+# (1 section per source), making structure tools ineffective.
+# FinanceBench SEC filings have multi-page/section structure where
+# section_index and term_index provide meaningful navigation.
+
+name: "Structure-tool variants"
+description: >
+  Evaluate the impact of structure-aware retrieval tools (section index
+  and terminology mapping) on agent performance with enterprise documents.
+
+variants:
+  - name: Full Tools
+    pipeline: agentic
+    experiment:
+      enable_agentic_refinement: true
+
+  - name: w/o Section Index
+    pipeline: agentic
+    experiment:
+      enable_agentic_refinement: true
+    agent:
+      enabled_tools:
+        - search
+        - decompose
+        - terminology
+        - evaluate
+        - inspect
+        - calculate
+
+  - name: w/o Terminology
+    pipeline: agentic
+    experiment:
+      enable_agentic_refinement: true
+    agent:
+      enabled_tools:
+        - search
+        - decompose
+        - structure
+        - evaluate
+        - inspect
+        - calculate
+
+  - name: w/o Structure Tools
+    pipeline: agentic
+    experiment:
+      enable_agentic_refinement: true
+    agent:
+      enabled_tools:
+        - search
+        - decompose
+        - evaluate
+        - inspect
+        - calculate

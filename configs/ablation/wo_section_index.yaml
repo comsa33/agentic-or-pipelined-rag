@@ -1,0 +1,14 @@
+# w/o Section Index — agent cannot browse document structure.
+name: w/o Section Index
+pipeline: agentic
+
+experiment:
+  enable_agentic_refinement: true
+
+agent:
+  enabled_tools:
+    - search
+    - decompose
+    - terminology
+    - evaluate
+    - inspect

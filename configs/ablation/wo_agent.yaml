@@ -1,0 +1,6 @@
+# w/o Agent — for-loop fallback.
+name: w/o Agent (For-Loop)
+pipeline: loop
+
+experiment:
+  enable_agentic_refinement: false

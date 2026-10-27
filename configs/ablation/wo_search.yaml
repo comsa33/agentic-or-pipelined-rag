@@ -1,0 +1,15 @@
+# w/o Search Tool — agent cannot perform re-retrieval.
+# Agent can only browse/evaluate initial passages.
+name: w/o Search (No Re-retrieval)
+pipeline: agentic
+
+experiment:
+  enable_agentic_refinement: true
+
+agent:
+  enabled_tools:
+    - decompose
+    - structure
+    - terminology
+    - evaluate
+    - inspect

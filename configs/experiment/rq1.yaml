@@ -1,0 +1,41 @@
+# Controlled grid: the five configurations of the paper on one model family
+# and one workload. Naive RAG, CRAG-style, Single-Pass and Loop Refinement are
+# the pipelined configurations, Agentic (ReAct) the agentic one; all share the
+# retriever, passage cap and generation signature. The file stem (rq1) is kept
+# because it names the result files (rq1_<variant>.jsonl) of the released runs.
+
+name: "Controlled grid: agentic vs pipelined configurations"
+description: >
+  The five configurations (Naive RAG, CRAG-style, Single-Pass, Loop
+  Refinement, Agentic (ReAct)) under shared components.
+
+variants:
+  - name: Naive RAG
+    pipeline: naive
+
+  - name: CRAG Replica
+    pipeline: crag
+
+  - name: Single-Pass
+    pipeline: loop
+    experiment:
+      enable_iteration: false
+      enable_agent_routing: false
+
+  - name: Loop Refinement
+    pipeline: loop
+    experiment:
+      enable_agent_routing: false
+
+  - name: Agentic (ReAct)
+    pipeline: agentic
+    experiment:
+      enable_agentic_refinement: true
+      enable_agent_routing: false
+    agent:
+      # The same four tools on every workload.
+      enabled_tools:
+        - search
+        - decompose
+        - evaluate
+        - calculate

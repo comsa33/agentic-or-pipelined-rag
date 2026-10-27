@@ -1,0 +1,6 @@
+# Full System — ReAct agent + all 7 tools.
+name: Full (Agent + All Tools)
+pipeline: agentic
+
+experiment:
+  enable_agentic_refinement: true

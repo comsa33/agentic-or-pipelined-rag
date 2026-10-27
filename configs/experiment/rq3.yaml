@@ -1,0 +1,34 @@
+# Evaluation-tool variants of the agentic instance (uncontrolled grid,
+# reported descriptively): Agent + 4D eval tool / Agent + 1D eval tool /
+# Agent w/o eval tool. The file stem names the result files of those runs.
+
+name: "Evaluation-tool variants"
+description: >
+  Compare the effect of multi-dimensional quality assessment as an
+  agent-accessible tool on decision-making and answer quality.
+
+variants:
+  - name: Agent + 4D Eval Tool
+    pipeline: agentic
+    experiment:
+      enable_agentic_refinement: true
+      enable_4d_evaluation: true
+
+  - name: Agent + 1D Eval Tool
+    pipeline: agentic
+    experiment:
+      enable_agentic_refinement: true
+      enable_4d_evaluation: false
+
+  - name: Agent w/o Eval Tool
+    pipeline: agentic
+    experiment:
+      enable_agentic_refinement: true
+    agent:
+      enabled_tools:
+        - search
+        - decompose
+        - structure
+        - terminology
+        - inspect
+        - calculate

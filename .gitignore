@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+wheels/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment (provider keys). Only the template is tracked.
+.env
+.env.*
+!.env.example
+
+# Data (downloaded or produced locally)
+data/raw/
+data/processed/
+data/indices/
+data/results/
+data/results-*/
+data/human_eval/
+human_eval.csv
+scripts/paper/out/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# IDE
+.idea/
+.vscode/
+*.swp
+

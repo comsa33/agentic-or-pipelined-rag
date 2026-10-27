@@ -1,0 +1,5 @@
+# Agentic RAG — ReAct-based agentic refinement.
+pipeline: agentic
+
+experiment:
+  enable_agentic_refinement: true

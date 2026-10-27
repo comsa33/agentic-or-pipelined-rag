@@ -1,0 +1,7 @@
+# 1D Evaluation — evaluate tool uses single relevance score instead of 4D.
+name: 1D Evaluation
+pipeline: agentic
+
+experiment:
+  enable_agentic_refinement: true
+  enable_4d_evaluation: false

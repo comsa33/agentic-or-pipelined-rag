@@ -1,0 +1,44 @@
+# Base configuration — shared defaults for all experiments.
+# Override per-pipeline or per-experiment via layered YAML configs.
+
+# Model configuration — all 4 LLM slots use the same model for fair comparison.
+# Override via .env (PREPROCESS_MODEL, EVALUATE_MODEL, GENERATE_MODEL, AGENT_MODEL)
+# or uncomment and set explicitly below.
+#
+# The paper's controlled grid sets all four slots to one model through the
+# environment (see README) and embeds with all-MiniLM-L6-v2.
+model:
+  temperature: 0.0
+  max_tokens: 4096
+
+retrieval:
+  top_k: 50
+  text_top_k: 40
+  query_method: rrf
+  hybrid_weight: 0.48
+  max_passages: 30
+
+evaluation:
+  quality_threshold: 40
+  max_retry_count: 3
+
+experiment:
+  seed: 42
+  datasets:
+    - hotpotqa
+    - 2wikimultihopqa
+    - musique
+    - financebench
+  # Ablation flags — all enabled by default
+  enable_iteration: true
+  enable_accumulation: true
+  enable_4d_evaluation: true
+  enable_refinement: true
+  enable_agent_routing: true
+  enable_dspy: true
+  enable_agentic_refinement: false
+
+agent:
+  max_iterations: 10
+  # enabled_tools: null = all 7 tools (search, decompose, structure, terminology, evaluate, inspect, calculate)
+  enabled_tools: null

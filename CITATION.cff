@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the paper below."
+title: "Agentic or Pipelined? Code for a confound-controlled empirical study"
+type: software
+license: MIT
+authors:
+  - family-names: Lee
+    given-names: Ruo
+  - family-names: Oh
+    given-names: Taeyeon
+preferred-citation:
+  type: article
+  title: "Agentic or Pipelined? A Confound-Controlled Empirical Study of an Architectural Decision in Retrieval-Augmented LLM Applications"
+  authors:
+    - family-names: Lee
+      given-names: Ruo
+    - family-names: Oh
+      given-names: Taeyeon
+  year: 2026
+  journal: "Under review (journal to be announced)"

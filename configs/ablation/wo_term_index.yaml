@@ -1,0 +1,14 @@
+# w/o Term Index — agent cannot map user terms to doc vocabulary.
+name: w/o Term Index
+pipeline: agentic
+
+experiment:
+  enable_agentic_refinement: true
+
+agent:
+  enabled_tools:
+    - search
+    - decompose
+    - structure
+    - evaluate
+    - inspect

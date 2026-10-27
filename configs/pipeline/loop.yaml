@@ -1,0 +1,2 @@
+# Loop RAG — for-loop iterative refinement (evaluate, refine the query, retrieve again).
+pipeline: loop
