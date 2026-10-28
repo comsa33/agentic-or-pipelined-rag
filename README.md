@@ -142,7 +142,7 @@ Four recorded runs fail the validator:
 - `20260908_122346_rq1_2wikimultihopqa_n200_gpt-5-mini_k1`, `20260910_085356_rq1_musique_n200_gpt-5-mini_k1` and `20260911_141538_rq1_hotpotqa_n200_gpt-5-mini_k1` fail two CRAG checks.
   - `errors`: 1, 2 and 3 error rows. Azure's content filter blocked these questions. They are listed in `exclusions.json`.
   - `usage complete`: 6, 3 and 3 rows whose calls had not all reported usage within the 10-second wait, so their token and cost figures may be short.
-- `20261027_075201_budget_matched_2wikimultihopqa_n200_claude-sonnet-5-5_k1` fails `run finished` and `variants complete`. It was stopped after its first configuration (Loop at budget 10). The paper's supplementary S4 gives the reason.
+- `20261027_075201_budget_matched_2wikimultihopqa_n200_claude-sonnet-5-5_k1` fails `run finished` and `variants complete`. It was stopped after its first configuration (Loop at budget 10). The paper's section on the budget-matched comparison gives the reason.
 
 ## Rebuild the paper's tables
 

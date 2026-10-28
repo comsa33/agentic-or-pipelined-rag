@@ -4,7 +4,7 @@
 1. FinanceBench visibility sweep (Gemini, n=150, table tab:threat_budget): per
    point, F1 and the judge score under both judges, with Agentic-Naive and
    Loop-Naive paired differences (delta, 95% CI, standard two-sided p).
-2. Judge swap (Section 5.4): per model-workload cell of the uncontrolled grid,
+2. Judge swap (the judge threat of the paper): per model-workload cell of the uncontrolled grid,
    whether the sign of the Agentic-Loop judge difference agrees between the
    reference judge and minimax-m3, with nano and gpt-4.1 each as reference.
    Same rule as `experiments.analysis.judge_swap`: only verdicts with

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EM, F1 and ROUGE-L of the agent variants on the uncontrolled grid (table tab:instances).
+"""EM, F1 and ROUGE-L of the agent variants on the uncontrolled grid (the supplementary table of agent variants).
 
 Reads the March 2026 Gemini runs of data/results/paper (the rq3 evaluation-tool
 runs, the rq4 structure-tool runs and the ablation runs) and the 27 March
